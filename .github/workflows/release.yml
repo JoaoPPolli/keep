@@ -146,7 +146,9 @@ jobs:
           import time
           expected = {p.name: {'size': p.stat().st_size, 'digest': 'sha256:' + hashlib.sha256(p.read_bytes()).hexdigest()}
                       for p in Path('artifacts').iterdir() if p.is_file()}
-          endpoint = 'repos/' + os.environ['GH_REPO'] + '/releases/tags/' + os.environ['KEEP_TAG']
+          # Tag lookup only finds published releases; drafts need their API URL.
+          endpoint = subprocess.check_output(['gh', 'release', 'view', os.environ['KEEP_TAG'],
+                                              '--json', 'apiUrl', '--jq', '.apiUrl'], text=True).strip()
           for attempt in range(12):
               release = json.loads(subprocess.check_output(['gh', 'api', endpoint], text=True))
               actual = {asset['name']: asset for asset in release['assets']}
@@ -184,12 +186,13 @@ jobs:
           import time
           from urllib.error import URLError
           from urllib.request import Request, urlopen
+          from urllib.parse import quote
           release = json.loads(Path(os.environ['RUNNER_TEMP'], 'keep-release-assets.json').read_text(encoding='utf-8'))
           for asset in release['assets']:
               expected = asset['digest'].removeprefix('sha256:')
               for attempt in range(8):
                   try:
-                      with urlopen(Request(asset['browser_download_url'], headers={'User-Agent': 'Keep-release-validation'}), timeout=60) as response:
+                      with urlopen(Request('https://github.com/' + os.environ['GH_REPO'] + '/releases/download/' + quote(os.environ['KEEP_TAG'], safe='') + '/' + quote(asset['name'], safe=''), headers={'User-Agent': 'Keep-release-validation'}), timeout=60) as response:
                           digest, size = hashlib.sha256(), 0
                           while chunk := response.read(1024 * 1024):
                               digest.update(chunk)
