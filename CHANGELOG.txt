@@ -1,0 +1,172 @@
+KEEP — HISTÓRICO DE VERSÕES
+
+Versão atual: 2.0.0
+Notas em português brasileiro. As versões aparecem da mais recente para a
+mais antiga. As atualizações do aplicativo continuam privadas; este histórico
+não distribui pacotes de instalação, vídeos ou informações de usuários.
+
+2.0.0 — Consolidação da próxima geração do Keep
+
+Esta é a entrega antes identificada como 1.11.0, agora renomeada para 2.0.0.
+A mudança de número não acrescenta funções além daquela entrega. Reúne todas
+as melhorias das etapas 1.8, 1.9, 1.10 e 1.11:
+
+- Arquivos: excluir o arquivo do computador com confirmação, mantendo o
+  histórico; detectar arquivos removidos; copiar o link original; escolher
+  o nome antes de baixar; organizar pastas por plataforma; consultar o espaço
+  ocupado pelos arquivos registrados.
+- Fila: adicionar vários links de uma vez, apontar links inválidos, reordenar
+  os pendentes, avisar sobre downloads duplicados e repetir falhas temporárias
+  com um limite de tentativas.
+- Editor: linha do tempo com pontas arrastáveis, navegação por quadros,
+  vários trechos separados, montagem na ordem escolhida, GIF de até 30 segundos
+  e recorte vertical 9:16 com escolha visual do enquadramento. Vídeos que já
+  estão em 9:16 são reconhecidos pelas dimensões e dispensam a conversão.
+- Integração com o computador: inicializadores com ícone para Windows e Linux,
+  abertura opcional pelo site e notificações opcionais ao concluir downloads.
+- Preferências e suporte: exportação e importação das opções sem dados de
+  sessão, novidades após atualizar, diagnóstico com ação sugerida e relatório
+  de erro sem cookies, tokens, títulos ou caminhos pessoais.
+- Recuperação: voltar a uma versão anterior compatível, preservando os
+  downloads e as preferências atuais, com proteção das configurações.
+
+Windows: as funcionalidades, a atualização e a restauração foram verificadas
+em cópias de teste isoladas. Linux: os pacotes e as rotinas foram verificados
+por estrutura e simulação; não houve validação nativa em uma sessão Linux.
+Navegadores podem exigir clique ou confirmação para abrir o aplicativo.
+
+1.11.0 — Inicializadores, integração e recuperação
+
+Entrega intermediária final que deu origem à versão 2.0.0.
+
+- Inicializador próprio com ícone e integração ao menu do Windows ou Linux.
+- Preferência para registrar a abertura do Keep pelo site, com ativação
+  separada no navegador e possibilidade de desativar.
+- Notificações opcionais ao concluir um download.
+- Retorno à versão anterior com preservação dos arquivos e das configurações.
+- Navegação por quadros usando os tempos reais da prévia, quando o índice
+  estiver disponível; indicação explícita quando o passo for estimado.
+
+1.10.0 — Editor de trechos
+
+- Linha do tempo visual para ajustar início e fim arrastando as pontas.
+- Avanço e retorno por quadros na prévia.
+- Lista de até 24 trechos do mesmo vídeo para baixar separadamente.
+- Junção dos trechos em um arquivo, na ordem escolhida.
+- Criação de GIF a partir de até 30 segundos de trechos.
+- Enquadramento vertical 9:16 com escolha visual da área e identificação de
+  vídeos que já têm essa proporção pelas dimensões.
+- Conferência da duração e da saída processada antes de marcar a edição como
+  concluída, com proteção de arquivos preexistentes durante falhas e limpeza.
+
+1.9.0 — Organização, preferências e suporte
+
+- Nome opcional do arquivo antes de iniciar o download.
+- Pastas automáticas por plataforma nas Preferências.
+- Entrada de vários links, indicação de inválidos e reordenação da fila.
+- Aviso de download duplicado com decisão de baixar novamente.
+- Exibição do espaço ocupado pelos arquivos registrados, incluindo parciais.
+- Tentativas automáticas limitadas para falhas temporárias.
+- Diagnóstico simples com ação recomendada e relatório seguro para suporte.
+- Exportação e importação das preferências, sem dados de sessão.
+- Novidades apresentadas após atualizar.
+- Ponte privada de compatibilidade para atualizar instalações antigas.
+
+1.8.0 — Ações de arquivos
+
+- Botão Excluir arquivo com confirmação, preservando o registro no histórico.
+- Indicação de arquivos removidos do computador.
+- Botão para copiar o link original de cada download.
+- Preparação do atualizador para receber os módulos das etapas seguintes.
+
+1.7.0 — Prévia, seleção e atualização pelo Keep
+
+- Botão opcional Colar e Baixar usando as opções padrão.
+- Preferência de cookies padrão para novas buscas e downloads.
+- Verificação e aplicação de atualização pelo aplicativo, usando a página
+  privada autorizada, além da importação de pacote recebido.
+- Escolha dos vídeos de um post do X quando houver mais de um.
+- Prévia local para assistir e marcar o início e o fim do corte com botões.
+- Orientações para o primeiro acesso à verificação privada quando o navegador
+  exigir autenticação.
+
+1.6.2 — Correção de cortes até o fim de Shorts
+
+- Correção de falhas quando a duração informada pela plataforma é um pouco
+  maior que a duração real da mídia.
+- Cortes pedidos até o fim passam a concluir no último instante disponível,
+  com aviso no histórico sobre o limite efetivamente encontrado.
+- Arquivos incompletos por outros motivos continuam sendo recusados.
+
+1.6.1 — Edição própria para Linux
+
+- Pacotes separados de instalação e atualização para Linux.
+- Inicializadores e atualizadores em formato SH.
+- Verificação de dependências e preparação dos componentes para Linux.
+- Integração com o gerenciador de arquivos e controle dos processos de
+  download no Linux.
+- Documentação específica explicando a diferença entre os pacotes Windows
+  e Linux. A validação Linux foi estrutural e simulada, sem execução nativa.
+
+1.6.0 — Fila, retomada e progresso
+
+- Fila automática que inicia os próximos itens, com até dois downloads ativos.
+- Velocidade e estimativa de tempo restante durante a transferência.
+- Indicação de processamento após a transferência.
+- Pausa e retomada de tarefas interrompidas.
+- Limpeza de arquivos parciais ao cancelar ou falhar e opção de descartar
+  itens pausados.
+- Botões Abrir pasta e Mostrar no Explorer.
+
+1.5.0 — Pastas e destino dos downloads
+
+- Pastas de download com data, horário e título mais fáceis de identificar.
+- Indicação do último download concluído.
+- Escolha persistente da pasta de destino nas Preferências.
+- Pacote de atualização Windows compacto, reutilizando os componentes da
+  instalação existente.
+
+1.4.0 — Baixar apenas um trecho
+
+- Seleção de início e fim para baixar apenas uma parte do vídeo ou áudio.
+- Suporte a horários em segundos, minutos, horas e frações de segundo.
+- Intervalo e duração mostrados antes de baixar.
+- Trecho escolhido indicado no nome do arquivo e no histórico.
+- Validação dos horários com base na duração informada pela plataforma.
+
+1.3.0 — Twitch e atualizador de pasta
+
+- Suporte a clipes e VODs gravados da Twitch.
+- Cookies isolados por plataforma.
+- Pacote de atualização com seleção da pasta antiga, validação dos arquivos,
+  cópia de segurança e preservação dos downloads e do histórico.
+- Guias do usuário em TXT e pacotes prontos para compartilhar.
+
+1.2.0 — Importação local de cookies
+
+- Importação opcional de arquivo cookies.txt para acessar a plataforma.
+- Importação mantida em memória, com uso local e limpeza das cópias temporárias
+  durante o encerramento normal das operações.
+- Mensagens mais claras sobre falhas de leitura dos cookies no Brave e em
+  outros navegadores.
+
+1.1.0 — Português brasileiro e versão portátil
+
+- Interface e mensagens principais em português brasileiro.
+- Pacotes portáteis Windows e edição leve que prepara os componentes na
+  primeira abertura, com verificação dos arquivos recebidos.
+- Uso opcional da sessão de um navegador para buscar ou baixar o vídeo.
+- Correção de caminhos com acentos no Windows que faziam downloads do X
+  parecerem ter falhado.
+- Mensagens distintas para verificações da plataforma, limites de acesso,
+  sessão inacessível e conteúdo privado.
+- Prévia e download passam a usar o mesmo primeiro vídeo de um post do X.
+
+1.0 — Primeira versão
+
+- Download local de vídeos do YouTube, incluindo Shorts, e de posts do X.
+- Vídeo em MP4 e áudio em MP3, com escolha de qualidade.
+- Histórico persistente e opção Salvar arquivo pelo navegador.
+- Até dois downloads simultâneos.
+- Inicializador Windows e atualização separada do mecanismo de download.
+- Processamento no próprio computador, com interface aberta no navegador.
