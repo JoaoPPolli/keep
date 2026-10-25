@@ -64,29 +64,32 @@ jobs:
             sudo apt-get install -y ffmpeg
           fi
           command -v node
-          python3 -m pip install --disable-pip-version-check playwright==1.55.0
-          if ! python3 -m playwright install --with-deps chromium > "$RUNNER_TEMP/keep-browser-install.log" 2>&1; then
-            python3 - <<'PYERROR'
-          import os
-          from pathlib import Path
-          message = Path(os.environ['RUNNER_TEMP'], 'keep-browser-install.log').read_text(errors='replace')[-9000:]
-          message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-          print('::error title=Browser tool installation failed::' + message)
-          PYERROR
-            exit 1
+          python3 -m pip install --disable-pip-version-check playwright==1.62.0
+          KEEP_RELEASE_CHROME=$(command -v google-chrome || command -v google-chrome-stable || true)
+          if [[ -z "$KEEP_RELEASE_CHROME" ]]; then
+            python3 -m playwright install --with-deps chrome
+            KEEP_RELEASE_CHROME=$(command -v google-chrome || command -v google-chrome-stable)
           fi
-          python3 - <<'PY' >> "$GITHUB_ENV"
-          from playwright.sync_api import sync_playwright
-          with sync_playwright() as playwright:
-              print('KEEP_TEST_CHROMIUM=' + playwright.chromium.executable_path)
-          PY
+          test -x "$KEEP_RELEASE_CHROME"
+          "$KEEP_RELEASE_CHROME" --version
+          echo "KEEP_TEST_CHROMIUM=$KEEP_RELEASE_CHROME" >> "$GITHUB_ENV"
 
       - name: Test the updater, preview, browser and packages
         shell: bash
         run: |
           set -euo pipefail
           test -x "$KEEP_TEST_CHROMIUM"
-          python3 -m unittest discover -s app/tests -v
+          if ! python3 -m unittest discover -s app/tests -v > "$RUNNER_TEMP/keep-tests.log" 2>&1; then
+            python3 - <<'PYERROR'
+          import os
+          from pathlib import Path
+          message = Path(os.environ['RUNNER_TEMP'], 'keep-tests.log').read_text(errors='replace')[-12000:]
+          message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::error title=Keep validation failed::' + message)
+          PYERROR
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/keep-tests.log"
           node --check app/dist/app.js
 
       - name: Build and validate update and complete distributions
