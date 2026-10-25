@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+/artifacts/
+/app/data/
+/app/downloads/
+/app/backups/
+/app/runtime/
+/app/tools/
+/app/.venv/
+/app/.keep*.lock

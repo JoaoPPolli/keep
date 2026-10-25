@@ -1,4 +1,4 @@
-KEEP 2.0.0
+KEEP 2.0.1
 Seus vídeos, sempre por perto.
 
 Baixe vídeos do YouTube, X e Twitch, escolha trechos e organize os arquivos
@@ -9,7 +9,7 @@ Site do Keep
 https://joaoppolli.github.io/keep/
 
 Versão atual, downloads e notas da entrega
-https://github.com/JoaoPPolli/keep/releases/tag/v2.0.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.0.1
 
 
 BAIXAR O KEEP
@@ -18,23 +18,23 @@ WINDOWS — PRIMEIRA INSTALAÇÃO
 Pacote portátil completo para Windows 10/11 de 64 bits, Intel/AMD.
 Inclui Python, FFmpeg, Node e o mecanismo de download.
 
-Keep-2.0.0-Windows-Portatil.zip
-https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Windows-Portatil.zip
+Keep-2.0.1-Windows-Portatil.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.1/Keep-2.0.1-Windows-Portatil.zip
 
 LINUX — PRIMEIRA INSTALAÇÃO
 Pacote para Linux x64 ou ARM64. Requer Python 3.10 ou posterior e FFmpeg.
 A primeira preparação dos demais componentes precisa de internet.
 
-Keep-2.0.0-Linux.tar.gz
-https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Linux.tar.gz
+Keep-2.0.1-Linux.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.1/Keep-2.0.1-Linux.tar.gz
 
 JÁ TEM O KEEP? BAIXE SOMENTE A ATUALIZAÇÃO DO SEU SISTEMA
 
-Windows — Keep-2.0.0-Windows-Atualizacao.zip
-https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Windows-Atualizacao.zip
+Windows — Keep-2.0.1-Windows-Atualizacao.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.1/Keep-2.0.1-Windows-Atualizacao.zip
 
-Linux — Keep-2.0.0-Linux-Atualizacao.tar.gz
-https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Linux-Atualizacao.tar.gz
+Linux — Keep-2.0.1-Linux-Atualizacao.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.1/Keep-2.0.1-Linux-Atualizacao.tar.gz
 
 A Release também oferece a instalação leve para Windows. Ela prepara os
 componentes na primeira abertura e exige internet; para começar com todos
@@ -73,10 +73,12 @@ Preferências, extraia o pacote de atualização e execute Atualizar Keep.bat
 no Windows ou bash "Atualizar Keep.sh" no Linux. Selecione a pasta antiga
 do aplicativo. Downloads, histórico e configurações são preservados.
 
-Os downloads manuais desta página e da Release são públicos. A opção
-Verificar atualização dentro do aplicativo continua usando a página
-privada autorizada. Quem não tem esse acesso pode baixar o pacote no
-GitHub e importá-lo ou usar o atualizador manual.
+A partir do Keep 2.0.1, Verificar atualização consulta o canal público,
+sem login. O app verifica ao abrir e mostra um aviso quando há uma versão
+nova. Você escolhe baixar o pacote e depois atualizar e reiniciar.
+
+Quem usa o Keep 2.0.0 precisa importar o pacote 2.0.1 uma vez nas
+Preferências. Depois disso, as verificações usam o canal público.
 
 
 O QUE O KEEP FAZ
@@ -89,8 +91,9 @@ O QUE O KEEP FAZ
 - Prévia, linha do tempo, marcação de início/fim e navegação por quadros.
   O Keep avisa quando o passo por quadro precisar ser estimado.
 - Até 24 trechos separados ou em uma montagem na ordem escolhida.
-- Recorte vertical 9:16 com escolha visual do enquadramento. Vídeos já
-  em 9:16 são identificados pelas dimensões e dispensam a conversão.
+- Recorte vertical 9:16 com prévia do resultado ao lado do original.
+  O resultado acompanha os ajustes, a reprodução e a busca no vídeo.
+  Vídeos já em 9:16 são identificados e dispensam a conversão.
 - Nome do arquivo, pasta de destino, pastas por plataforma e aviso de
   duplicados, com informações de velocidade, tempo restante e espaço usado.
 - Abrir pasta, mostrar arquivo, copiar fonte e excluir o arquivo com
@@ -105,29 +108,29 @@ ao vivo não estão incluídos.
 
 CHANGELOG E GUIAS
 
-Histórico completo das 15 versões, da 1.0 à 2.0.0
+Histórico completo das 16 versões, da 1.0 à 2.0.1
 https://joaoppolli.github.io/keep/changelog.html
 
 Changelog em TXT no próprio GitHub
 https://github.com/JoaoPPolli/keep/blob/main/CHANGELOG.txt
 
 Guia Windows em TXT
-https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-LEIA-ME-Windows.txt
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.1/Keep-2.0.1-LEIA-ME-Windows.txt
 
 Guia Linux em TXT
-https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-LEIA-ME-Linux.txt
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.1/Keep-2.0.1-LEIA-ME-Linux.txt
 
 
-SOBRE A VERSÃO 2.0
+SOBRE A VERSÃO 2.0.1
 
-A entrega antes identificada como 1.11.0 passou a se chamar 2.0.0.
-O conjunto de recursos é o mesmo; a mudança de número não exige mover
-os downloads nem recriar as preferências.
+- Verificação pública de atualização, sem página privada ou login.
+- Aviso visual quando uma versão mais recente está disponível.
+- Prévia 9:16 ao lado do original, sincronizada com os ajustes e o vídeo.
 
-Windows: 230 testes passaram, e a atualização real de 1.11 para 2.0 foi
-verificada em uma cópia isolada, preservando arquivo, histórico e opções.
-Linux: houve verificações estruturais e testes simulados; não houve
-validação nativa em uma sessão Linux.
+37 testes passaram no ambiente Linux, incluindo sete testes no navegador,
+comparação do recorte com o FFmpeg e atualização manual em instalações
+isoladas para os dois formatos de pacote. Não houve teste nativo no Windows.
+Integrações de menu e notificações dependem da sessão gráfica do computador.
 
 
 PRIVACIDADE E INTEGRIDADE
@@ -142,3 +145,15 @@ você tiver autorização para baixá-los.
 
 A Release inclui SHA256SUMS.txt para conferir a integridade dos pacotes.
 As licenças dos componentes distribuídos estão na pasta licenses/.
+
+
+DESENVOLVIMENTO DO APLICATIVO
+
+Os fontes do app estão em app/, recuperados dos pacotes públicos 2.0.0
+com SHA-256 conferido. A versão 2.0.1 inclui verificação pública
+de atualizações, aviso de versão nova e prévia do enquadramento vertical.
+Consulte app/README.md para executar, testar e gerar os pacotes.
+
+O manifesto updates.json anuncia somente pacotes já publicados. Para
+migrar do 2.0.0, importe o pacote 2.0.1 uma vez nas Preferências;
+o app instalado não muda apenas com a publicação do site.

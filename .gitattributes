@@ -1,0 +1,2 @@
+# Preserve the verified release sources' bytes, including Windows line endings.
+app/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

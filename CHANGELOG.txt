@@ -1,15 +1,32 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.0.0
+Versão atual: 2.0.1
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.0.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.0.1
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.0.1 — Atualizações públicas e prévia vertical
+
+- Verificar atualização consulta o canal público, sem login ou pop-up.
+- Consulta automática ao abrir e aviso visual quando há uma versão nova.
+- Download explícito do pacote, com conferência de tamanho, versão e SHA-256;
+  a instalação e o reinício continuam sendo ações escolhidas pelo usuário.
+- Prévia do resultado 9:16 ao lado do original, acompanhando os ajustes,
+  o arraste da borda, a reprodução e a busca em um vídeo pausado.
+- Preservação da importação local de pacotes e da restauração anterior.
+
+Para migrar do Keep 2.0.0, importe uma vez o pacote 2.0.1 do seu sistema
+nas Preferências. O aplicativo antigo ainda usa a verificação privada.
+
+Validação: 37 testes no ambiente Linux, incluindo sete testes no navegador,
+comparação dos pixels do recorte com o FFmpeg e atualização manual em cópias
+isoladas para os formatos Windows e Linux. Não houve teste nativo no Windows.
 
 2.0.0 — Consolidação da próxima geração do Keep
 

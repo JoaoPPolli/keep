@@ -1,0 +1,195 @@
+name: Publish Keep release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish (for example v2.0.1)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: keep-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      KEEP_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the release tag and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          sys.path.insert(0, 'scripts')
+          from build_update import constants
+          tag = os.environ['KEEP_TAG']
+          version = constants('server.py')['VERSION']
+          if not re.fullmatch(r'v\d+\.\d+\.\d+', tag) or tag != 'v' + version:
+              raise SystemExit('The existing version tag must match app/server.py VERSION.')
+          tagged = subprocess.check_output(['git', 'rev-parse', '--verify', 'refs/tags/' + tag + '^{commit}'], text=True).strip()
+          checked_out = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if tagged != checked_out:
+              raise SystemExit('The checked-out source differs from the existing release tag.')
+          print('Verified tagged source:', tag, checked_out)
+          PY
+
+      - name: Prepare browser and media test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          command -v node
+          python3 -m pip install --disable-pip-version-check playwright==1.55.0
+          python3 -m playwright install --with-deps chromium
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as playwright:
+              print('KEEP_TEST_CHROMIUM=' + playwright.chromium.executable_path)
+          PY
+
+      - name: Test the updater, preview, browser and packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$KEEP_TEST_CHROMIUM"
+          python3 -m unittest discover -s app/tests -v
+          node --check app/dist/app.js
+
+      - name: Build and validate update and complete distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/build_update.py --output artifacts
+          python3 scripts/build_distribution.py --output artifacts
+          cd artifacts
+          sha256sum --check SHA256SUMS.txt
+
+      - name: Upload assets to a draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -d '' assets < <(find artifacts -maxdepth 1 -type f -print0)
+          test "${#assets[@]}" -gt 0
+          cat > "$RUNNER_TEMP/keep-release-notes.txt" <<'NOTES'
+          O Keep 2.0.1 traz verificação pública de atualizações sem login, aviso visual de nova versão e prévia do resultado vertical 9:16 acompanhando os ajustes e a reprodução.
+
+          Primeira instalação: escolha o pacote portátil Windows ou o pacote Linux completo. No Linux, instale Python 3.10+ e FFmpeg e execute Iniciar Keep.sh. Os componentes incluídos no Windows são os mesmos da distribuição 2.0.0, com o código do app atualizado.
+
+          Já usa o Keep 2.0.0? Importe uma vez o pacote pequeno de atualização do seu sistema nas Preferências. O botão instalado no 2.0.0 ainda usa a consulta privada; após a migração, o canal público funciona sem login. Versões antigas sem importação podem usar o atualizador manual com o Keep fechado.
+
+          A consulta de versão não instala nada automaticamente. Você escolhe baixar, conferir e aplicar a atualização. Downloads, histórico e preferências são preservados.
+
+          Validação: testes do atualizador, navegador, comparação de recorte com FFmpeg e atualização manual em instalações isoladas. Não houve execução nativa Windows nesta validação. SHA256SUMS.txt permite conferir a integridade dos pacotes e guias.
+          NOTES
+          if gh release view "$KEEP_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/keep-release-draft"; then
+            if [[ "$(cat "$RUNNER_TEMP/keep-release-draft")" == true ]]; then
+              gh release upload "$KEEP_TAG" "${assets[@]}" --clobber
+            else
+              echo 'Release already public: verifying existing assets without replacing them.'
+            fi
+          else
+            gh release create "$KEEP_TAG" "${assets[@]}" --verify-tag --draft \
+              --title "Keep ${KEEP_TAG#v}" --notes-file "$RUNNER_TEMP/keep-release-notes.txt"
+          fi
+
+      - name: Verify GitHub asset sizes and SHA-256 before publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import time
+          expected = {p.name: {'size': p.stat().st_size, 'digest': 'sha256:' + hashlib.sha256(p.read_bytes()).hexdigest()}
+                      for p in Path('artifacts').iterdir() if p.is_file()}
+          endpoint = 'repos/' + os.environ['GH_REPO'] + '/releases/tags/' + os.environ['KEEP_TAG']
+          for attempt in range(12):
+              release = json.loads(subprocess.check_output(['gh', 'api', endpoint], text=True))
+              actual = {asset['name']: asset for asset in release['assets']}
+              valid = set(actual) == set(expected) and all(
+                  actual[name].get('size') == value['size'] and actual[name].get('digest') == value['digest']
+                  for name, value in expected.items())
+              if valid:
+                  Path(os.environ['RUNNER_TEMP'], 'keep-release-assets.json').write_text(json.dumps(release), encoding='utf-8')
+                  print('Verified all uploaded assets:', len(expected))
+                  break
+              if attempt == 11:
+                  raise SystemExit('Uploaded asset names, sizes or GitHub SHA-256 digests differ from the build; release not published.')
+              time.sleep(5)
+          PY
+
+      - name: Publish the verified release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$(gh release view "$KEEP_TAG" --json isDraft --jq .isDraft)" == true ]]; then
+            gh release edit "$KEEP_TAG" --draft=false --latest
+          fi
+
+      - name: Verify anonymous public downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import time
+          from urllib.error import URLError
+          from urllib.request import Request, urlopen
+          release = json.loads(Path(os.environ['RUNNER_TEMP'], 'keep-release-assets.json').read_text(encoding='utf-8'))
+          for asset in release['assets']:
+              expected = asset['digest'].removeprefix('sha256:')
+              for attempt in range(8):
+                  try:
+                      with urlopen(Request(asset['browser_download_url'], headers={'User-Agent': 'Keep-release-validation'}), timeout=60) as response:
+                          digest, size = hashlib.sha256(), 0
+                          while chunk := response.read(1024 * 1024):
+                              digest.update(chunk)
+                              size += len(chunk)
+                      if size != asset['size'] or digest.hexdigest() != expected:
+                          raise ValueError('Public download does not match the verified uploaded asset.')
+                      print('Public SHA-256 verified:', asset['name'])
+                      break
+                  except (OSError, URLError, ValueError):
+                      if attempt == 7:
+                          raise
+                      time.sleep(5)
+          PY
+          echo "Published https://github.com/$GH_REPO/releases/tag/$KEEP_TAG"
+          echo 'The source/site branch and updates.json can now be advanced after checking this successful run.'

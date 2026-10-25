@@ -1,0 +1,148 @@
+KEEP 2.0.1 — GUIA EM PORTUGUÊS BRASILEIRO
+LINUX — X64 OU ARM64
+
+Esta versão traz atualizações públicas, aviso de nova versão e prévia 9:16.
+
+COMEÇAR
+
+Instale Python 3.10 ou posterior e FFmpeg pelo gerenciador de pacotes da sua
+distribuição. Extraia o pacote Linux completo. Abra um terminal na pasta e
+execute: bash "Iniciar Keep.sh"
+
+O iniciador verifica os componentes e prepara o mecanismo. O runtime de
+vídeo é verificado antes do download. A primeira preparação precisa de
+internet. Os executáveis Windows não são usados no Linux.
+
+Depois, em Preferências, clique em Instalar inicializador. O Keep passa a
+aparecer no menu de aplicativos do seu usuário. Se o ambiente permitir,
+use o menu do aplicativo para adicioná-lo aos favoritos ou à barra.
+Mantenha a pasta no mesmo lugar; se mover, recrie o inicializador.
+
+As integrações de menu e protocolo usam XDG apenas para o seu usuário.
+A abertura pelo site requer xdg-utils. As notificações usam notify-send.
+A seleção visual de pasta precisa de Zenity ou KDialog; também é possível
+digitar o caminho completo da pasta nas Preferências.
+
+ATUALIZAÇÃO MANUAL
+
+Feche completamente o Keep nas Preferências. Extraia o TAR.GZ de atualização
+e execute: bash "Atualizar Keep.sh"
+Informe a pasta antiga do Keep. Dados e componentes são preservados.
+Reabra pelo menu ou por: bash "Iniciar Keep.sh"
+No Keep 1.8 ou posterior, também é possível importar o pacote Linux pequeno
+pelas Preferências. Não use o ZIP Windows nem o atualizador .bat no Linux.
+
+O QUE ESTA VERSÃO INCLUI
+
+Downloads: YouTube, X e clipes/VODs da Twitch; MP4, MP3 e GIF.
+Cole vários links para adicionar à fila. Posts do X com vários vídeos pedem
+sua seleção. Até dois downloads trabalham ao mesmo tempo; arraste a fila ou
+use as setas para ordenar os pendentes. Falhas temporárias têm no máximo duas
+novas tentativas, com espera. Erros de login, cookies ou formato pedem ação.
+
+Escolha um nome antes de baixar. Em Preferências, habilite pastas automáticas
+por plataforma, qualidade padrão, cookies padrão e o botão Colar e Baixar.
+Downloads idênticos já concluídos geram um aviso antes de repetir.
+O espaço ocupado considera arquivos dos downloads registrados, incluindo
+parciais. Arquivos fora do histórico não entram nessa contagem.
+
+Em cada download, Salvar arquivo, Abrir pasta, Mostrar na pasta e Copiar link
+facilitam o acesso. Excluir arquivo apaga somente o arquivo final do PC,
+após confirmação, mantendo o registro. A exclusão é permanente. Arquivos
+removidos por outro programa aparecem como indisponíveis. Limpar o histórico
+mantém os arquivos; pausar mantém os parciais e cancelar os descarta.
+
+EDITOR DE TRECHOS
+
+Busque um vídeo e escolha um trecho. Ajuste os horários nos campos ou arraste
+as pontas da linha do tempo. Prepare a prévia para assistir, marcar início/fim
+e navegar por quadros. Quando o índice de quadros estiver disponível, os
+botões usam os tempos reais da prévia, inclusive em vídeo com taxa variável.
+Se o índice não puder ser preparado dentro do limite, o passo será estimado
+e a interface avisará. A prévia pode ter qualidade menor que o arquivo final.
+
+Adicione até 24 trechos à lista. Escolha arquivos separados ou uma montagem
+na ordem da lista. Você pode reordenar ou remover os trechos. Os limites de
+montagens podem ser ajustados aos quadros do arquivo baixado, com aviso e
+duração final. Cada montagem tem limite de duas horas. Trechos distantes,
+quando unidos, podem exigir bastante tempo e espaço temporário; escolha
+arquivos separados para baixar apenas cada intervalo.
+
+GIF: até 30 segundos no total, 12 quadros por segundo e largura de até 640px.
+Vídeo vertical: selecione MP4 e ative o enquadramento 9:16. Prepare a prévia
+e arraste a área verde ou use os controles de posição. Vídeos já em 9:16 são
+identificados pelas dimensões e dispensam a conversão; o tipo do link não
+determina isso. A conversão recorta a imagem fora da área escolhida.
+
+O arquivo só é marcado como concluído após a conferência da edição. Um nome
+que já exista na pasta é preservado. A limpeza de falhas do editor remove
+somente os intermediários gerados pelo próprio download.
+
+ABERTURA PELO SITE E NOTIFICAÇÕES
+
+Em Preferências, habilite Permitir abrir pelo site. Isso registra somente
+para o seu usuário a integração keep://launch, que pode apenas abrir o Keep;
+ela não aceita comandos, caminhos ou links de download.
+
+Abra a configuração do navegador pelo link indicado na mesma seção. Na
+página privada, escolha se deseja lembrar a abertura automática nesse
+navegador. Essa escolha é separada porque cada navegador e cada endereço têm
+seu próprio armazenamento. Só há uma tentativa por visita. O navegador pode
+pedir confirmação ou exigir um clique em Abrir Keep. Não há abertura
+silenciosa garantida nem tentativa de contornar as proteções do navegador.
+Para desativar, use a opção local e o link para esquecer a escolha no site.
+
+Notificações de conclusão são opcionais e ficam desativadas inicialmente.
+Ative em Preferências. O aviso depende das permissões e do modo de foco do
+sistema. No Linux, é necessário notify-send e uma sessão gráfica com serviço
+de notificações. Não é necessário dar permissão de notificações ao navegador.
+
+ATUALIZAR E VOLTAR À VERSÃO ANTERIOR
+
+O Keep consulta a versão pública ao abrir, sem login ou janela de acesso.
+Quando houver uma versão nova, um aviso aparece no app e nas Preferências.
+Verificar atualização refaz a consulta. Clique em Baixar atualização para
+receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
+A consulta não baixa nem instala o pacote automaticamente.
+
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.0.1 do seu sistema
+nas Preferências. Versões anteriores sem importação podem usar o atualizador
+manual com o Keep fechado. O pacote deve vir da release pública oficial em
+https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências
+são preservados; a instalação conferirá a integridade antes de trocar arquivos.
+
+Ao usar Enquadrar em vídeo vertical, prepare a prévia para ver o original e
+o resultado 9:16 lado a lado. Arraste a borda verde ou ajuste os controles;
+a imagem vertical acompanha a reprodução e o instante escolhido no original.
+
+Em Preferências, Voltar à versão anterior mostra cópias criadas durante
+atualizações nesta instalação. Prepare a restauração, confira a versão e
+confirme o reinício. Downloads, fila, histórico e preferências atuais são
+preservados; uma cópia separada das preferências também é guardada localmente.
+Recursos novos podem ficar indisponíveis na versão antiga. Só cópias completas
+compatíveis do Keep 1.7 ou posterior são aceitas. Cópias alteradas ou incompletas
+são recusadas. Os pacotes enviados aos amigos não incluem suas cópias pessoais.
+
+PRIVACIDADE E SUPORTE
+
+Exporte as preferências em TXT para levar suas opções a outro computador.
+Backups antigos continuam aceitos. O backup não contém cookies, histórico,
+caminho da pasta nem ativa registro de protocolo em outro PC. Cookies
+importados são mantidos somente em memória e precisam ser importados de novo
+ao reabrir. Cookies do navegador são lidos apenas na opção escolhida.
+
+Em erros, confira o diagnóstico e a ação sugerida. Copiar relatório gera
+somente campos permitidos: versão, sistema, estado, formato, qualidade e
+categoria do problema. Links, títulos, caminhos, cookies, tokens e dados de
+sessão não entram no relatório. Não envie arquivos de cookies para suporte.
+
+Os pacotes compartilháveis não incluem seus downloads, histórico, configurações,
+cookies ou backups pessoais. As licenças dos componentes estão em licenses/.
+Instagram e transmissões ao vivo não fazem parte desta versão.
+
+VALIDAÇÃO
+
+Windows: testes de funcionalidades, mídia real gerada para teste, atalhos,
+atualização e restauração executados em instalações isoladas.
+Linux: estrutura dos pacotes, permissões, gramática Python e rotinas verificadas
+com testes simulados no Windows. Não houve validação nativa em uma sessão Linux.

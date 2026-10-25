@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "version": "2.0.0",
+  "release_url": "https://github.com/JoaoPPolli/keep/releases/tag/v2.0.0",
+  "packages": {
+    "windows": {
+      "url": "https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Windows-Atualizacao.zip",
+      "sha256": "1f22e915354c624f0d69b6b7282d705c5afd878382d6e0e0828c86a59c6b1c37",
+      "size": 137134
+    },
+    "linux": {
+      "url": "https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Linux-Atualizacao.tar.gz",
+      "sha256": "3e45038b88a09267439e3ca8f736462bd9e8de079531c353d3f23f8b9887105d",
+      "size": 127076
+    }
+  }
+}

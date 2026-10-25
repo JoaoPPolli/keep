@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#101514">
-<meta name="description" content="Histórico de todas as versões do Keep. Conheça as novidades e correções, da primeira entrega à versão 2.0.">
+<meta name="description" content="Histórico de todas as versões do Keep. Conheça as novidades e correções, da primeira entrega à versão 2.0.1.">
 <title>Changelog — Keep</title>
 <style>.header-pages{display:flex;align-items:center;gap:22px;font-size:12px;font-weight:650}.header-pages a{color:#a6b2a9}.header-pages a:hover,.header-pages a[aria-current]{color:#d5f879}@media(max-width:620px){.header-pages{gap:12px;font-size:10px}}
 :root{color-scheme:dark;--bg:#101514;--surface:#19211e;--surface-high:#1e2822;--line:#303c33;--text:#f3f6ee;--muted:#a6b2a9;--accent:#d5f879;--ink:#182112}
@@ -32,7 +32,8 @@
 <a class="text-download" href="CHANGELOG.txt" download="Keep-CHANGELOG.txt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5"/></svg>Baixar histórico em TXT</a>
 </div>
 <div class="layout">
-<nav class="versions-nav" aria-label="Ir para uma versão"><p class="nav-heading">15 versões · mais recente primeiro</p><ul class="nav-list"><li><a href="#v2-0-0" class="latest-link"><span>2.0.0</span><span class="nav-current">Atual</span></a></li>
+<nav class="versions-nav" aria-label="Ir para uma versão"><p class="nav-heading">16 versões · mais recente primeiro</p><ul class="nav-list"><li><a href="#v2-0-1" class="latest-link"><span>2.0.1</span><span class="nav-current">Atual</span></a></li>
+<li><a href="#v2-0-0"><span>2.0.0</span></a></li>
 <li><a href="#v1-11-0"><span>1.11.0</span></a></li>
 <li><a href="#v1-10-0"><span>1.10.0</span></a></li>
 <li><a href="#v1-9-0"><span>1.9.0</span></a></li>
@@ -47,8 +48,15 @@
 <li><a href="#v1-2-0"><span>1.2.0</span></a></li>
 <li><a href="#v1-1-0"><span>1.1.0</span></a></li>
 <li><a href="#v1-0"><span>1.0</span></a></li></ul></nav>
-<main class="release-list" id="conteudo" aria-label="Novidades e correções por versão"><section class="release release-latest" id="v2-0-0" aria-labelledby="title-v2-0-0">
-<div class="release-top"><span class="release-kind">Versão atual</span><a class="permalink" href="#v2-0-0" aria-label="Link da versão 2.0.0">#</a></div>
+<main class="release-list" id="conteudo" aria-label="Novidades e correções por versão"><section class="release release-latest" id="v2-0-1" aria-labelledby="title-v2-0-1">
+<div class="release-top"><span class="release-kind">Versão atual</span><a class="permalink" href="#v2-0-1" aria-label="Link da versão 2.0.1">#</a></div>
+<h2 id="title-v2-0-1"><span class="version-number">2.0.1</span><span class="release-title">Atualizações públicas e prévia vertical</span></h2>
+<div class="release-body"><ul><li><strong>Atualização pública:</strong> Verificar atualização consulta o canal público sem login ou pop-up. O Keep também verifica ao abrir e mostra um aviso quando há uma versão nova.</li><li><strong>Instalação escolhida por você:</strong> baixe o pacote quando quiser e depois confirme a atualização e o reinício. Tamanho, versão e SHA-256 são conferidos antes de preparar a instalação; seus arquivos e preferências são preservados.</li><li><strong>Prévia vertical:</strong> confira o resultado 9:16 ao lado do original. A imagem acompanha os controles, o arraste da borda, a reprodução e a busca em um vídeo pausado.</li><li>A importação local de pacotes e a restauração de uma versão anterior continuam disponíveis.</li></ul>
+<p><strong>Para quem usa o Keep 2.0.0:</strong> importe uma vez o pacote 2.0.1 do seu sistema nas Preferências. Depois disso, as verificações usam o canal público.</p>
+<p>37 testes passaram no ambiente Linux, incluindo sete testes no navegador, comparação dos pixels do recorte com o FFmpeg e atualização manual em cópias isoladas para os formatos Windows e Linux. Não houve teste nativo no Windows.</p></div>
+</section>
+<section class="release" id="v2-0-0" aria-labelledby="title-v2-0-0">
+<div class="release-top"><span class="release-kind">Histórico</span><a class="permalink" href="#v2-0-0" aria-label="Link da versão 2.0.0">#</a></div>
 <h2 id="title-v2-0-0"><span class="version-number">2.0.0</span><span class="release-title">Consolidação da próxima geração do Keep</span></h2>
 <div class="release-body"><p>Esta é a entrega antes identificada como 1.11.0, agora renomeada para 2.0.0. A mudança de número não acrescenta funções além daquela entrega. Reúne todas as melhorias das etapas 1.8, 1.9, 1.10 e 1.11:</p>
 <ul><li><strong>Arquivos:</strong> excluir o arquivo do computador com confirmação, mantendo o histórico; detectar arquivos removidos; copiar o link original; escolher o nome antes de baixar; organizar pastas por plataforma; consultar o espaço ocupado pelos arquivos registrados.</li><li><strong>Fila:</strong> adicionar vários links de uma vez, apontar links inválidos, reordenar os pendentes, avisar sobre downloads duplicados e repetir falhas temporárias com um limite de tentativas.</li><li><strong>Editor:</strong> linha do tempo com pontas arrastáveis, navegação por quadros, vários trechos separados, montagem na ordem escolhida, GIF de até 30 segundos e recorte vertical 9:16 com escolha visual do enquadramento. Vídeos que já estão em 9:16 são reconhecidos pelas dimensões e dispensam a conversão.</li><li><strong>Integração com o computador:</strong> inicializadores com ícone para Windows e Linux, abertura opcional pelo site e notificações opcionais ao concluir downloads.</li><li><strong>Preferências e suporte:</strong> exportação e importação das opções sem dados de sessão, novidades após atualizar, diagnóstico com ação sugerida e relatório de erro sem cookies, tokens, títulos ou caminhos pessoais.</li><li><strong>Recuperação:</strong> voltar a uma versão anterior compatível, preservando os downloads e as preferências atuais, com proteção das configurações.</li></ul>
@@ -57,7 +65,7 @@
 <section class="release" id="v1-11-0" aria-labelledby="title-v1-11-0">
 <div class="release-top"><span class="release-kind">Histórico</span><a class="permalink" href="#v1-11-0" aria-label="Link da versão 1.11.0">#</a></div>
 <h2 id="title-v1-11-0"><span class="version-number">1.11.0</span><span class="release-title">Inicializadores, integração e recuperação</span></h2>
-<div class="release-body"><p>Entrega intermediária final que deu origem à versão 2.0.0.</p>
+<div class="release-body"><p>Entrega intermediária final que deu origem à versão 2.0.1.0.</p>
 <ul><li>Inicializador próprio com ícone e integração ao menu do Windows ou Linux.</li><li>Preferência para registrar a abertura do Keep pelo site, com ativação separada no navegador e possibilidade de desativar.</li><li>Notificações opcionais ao concluir um download.</li><li>Retorno à versão anterior com preservação dos arquivos e das configurações.</li><li>Navegação por quadros usando os tempos reais da prévia, quando o índice estiver disponível; indicação explícita quando o passo for estimado.</li></ul></div>
 </section>
 <section class="release" id="v1-10-0" aria-labelledby="title-v1-10-0">
