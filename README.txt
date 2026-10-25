@@ -1,0 +1,144 @@
+KEEP 2.0.0
+Seus vídeos, sempre por perto.
+
+Baixe vídeos do YouTube, X e Twitch, escolha trechos e organize os arquivos
+no seu computador. O Keep funciona como um aplicativo local com interface
+no navegador, em português brasileiro.
+
+Site do Keep
+https://joaoppolli.github.io/keep/
+
+Versão atual, downloads e notas da entrega
+https://github.com/JoaoPPolli/keep/releases/tag/v2.0.0
+
+
+BAIXAR O KEEP
+
+WINDOWS — PRIMEIRA INSTALAÇÃO
+Pacote portátil completo para Windows 10/11 de 64 bits, Intel/AMD.
+Inclui Python, FFmpeg, Node e o mecanismo de download.
+
+Keep-2.0.0-Windows-Portatil.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Windows-Portatil.zip
+
+LINUX — PRIMEIRA INSTALAÇÃO
+Pacote para Linux x64 ou ARM64. Requer Python 3.10 ou posterior e FFmpeg.
+A primeira preparação dos demais componentes precisa de internet.
+
+Keep-2.0.0-Linux.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Linux.tar.gz
+
+JÁ TEM O KEEP? BAIXE SOMENTE A ATUALIZAÇÃO DO SEU SISTEMA
+
+Windows — Keep-2.0.0-Windows-Atualizacao.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Windows-Atualizacao.zip
+
+Linux — Keep-2.0.0-Linux-Atualizacao.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-Linux-Atualizacao.tar.gz
+
+A Release também oferece a instalação leve para Windows. Ela prepara os
+componentes na primeira abertura e exige internet; para começar com todos
+os componentes incluídos, escolha o pacote portátil completo acima.
+
+
+COMEÇAR NO WINDOWS
+
+1. Extraia todo o ZIP portátil para uma pasta do seu computador.
+2. Abra Keep.exe. A alternativa é Iniciar Keep.bat.
+3. Cole um link, clique em Buscar vídeo e escolha o formato e a qualidade.
+4. Para criar o atalho do menu Iniciar, use Instalar inicializador nas
+   Preferências. Depois, fixe o Keep pelas opções do próprio Windows.
+
+
+COMEÇAR NO LINUX
+
+1. Instale Python 3.10 ou posterior e FFmpeg pelo gerenciador de pacotes
+   da sua distribuição.
+2. Extraia o TAR.GZ completo e abra um terminal na pasta do Keep.
+3. Execute: bash "Iniciar Keep.sh"
+4. O iniciador verifica e prepara os demais componentes. Em Preferências,
+   Instalar inicializador adiciona o Keep ao menu do seu usuário.
+
+Integrações de menu, seleção de pasta, protocolo e notificações dependem
+das ferramentas e da sessão gráfica da sua distribuição. Confira o guia TXT.
+
+
+ATUALIZAR PRESERVANDO SEUS ARQUIVOS
+
+No Keep 1.8 ou posterior, importe o pacote pequeno de atualização nas
+Preferências. Use o ZIP no Windows e o TAR.GZ no Linux.
+
+Para atualizar pelo método manual, encerre completamente o Keep nas
+Preferências, extraia o pacote de atualização e execute Atualizar Keep.bat
+no Windows ou bash "Atualizar Keep.sh" no Linux. Selecione a pasta antiga
+do aplicativo. Downloads, histórico e configurações são preservados.
+
+Os downloads manuais desta página e da Release são públicos. A opção
+Verificar atualização dentro do aplicativo continua usando a página
+privada autorizada. Quem não tem esse acesso pode baixar o pacote no
+GitHub e importá-lo ou usar o atualizador manual.
+
+
+O QUE O KEEP FAZ
+
+- YouTube e Shorts, posts do X e clipes/VODs gravados da Twitch.
+- Vídeo MP4, áudio MP3 e GIF de até 30 segundos.
+- Fila com até dois downloads ativos, entrada de vários links, reordenação,
+  pausa, retomada e tentativas limitadas para falhas temporárias.
+- Seleção dos vídeos de posts do X que tenham mais de um vídeo.
+- Prévia, linha do tempo, marcação de início/fim e navegação por quadros.
+  O Keep avisa quando o passo por quadro precisar ser estimado.
+- Até 24 trechos separados ou em uma montagem na ordem escolhida.
+- Recorte vertical 9:16 com escolha visual do enquadramento. Vídeos já
+  em 9:16 são identificados pelas dimensões e dispensam a conversão.
+- Nome do arquivo, pasta de destino, pastas por plataforma e aviso de
+  duplicados, com informações de velocidade, tempo restante e espaço usado.
+- Abrir pasta, mostrar arquivo, copiar fonte e excluir o arquivo com
+  confirmação, mantendo seu registro no histórico.
+- Preferências portáteis, diagnóstico, relatório de erro sem dados de
+  sessão, notificações opcionais e recuperação da versão anterior.
+
+Montagens têm limite de duas horas. Prévias e junções de trechos distantes
+podem precisar de mais tempo e espaço temporário. Instagram e transmissões
+ao vivo não estão incluídos.
+
+
+CHANGELOG E GUIAS
+
+Histórico completo das 15 versões, da 1.0 à 2.0.0
+https://joaoppolli.github.io/keep/changelog.html
+
+Changelog em TXT no próprio GitHub
+https://github.com/JoaoPPolli/keep/blob/main/CHANGELOG.txt
+
+Guia Windows em TXT
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-LEIA-ME-Windows.txt
+
+Guia Linux em TXT
+https://github.com/JoaoPPolli/keep/releases/download/v2.0.0/Keep-2.0.0-LEIA-ME-Linux.txt
+
+
+SOBRE A VERSÃO 2.0
+
+A entrega antes identificada como 1.11.0 passou a se chamar 2.0.0.
+O conjunto de recursos é o mesmo; a mudança de número não exige mover
+os downloads nem recriar as preferências.
+
+Windows: 230 testes passaram, e a atualização real de 1.11 para 2.0 foi
+verificada em uma cópia isolada, preservando arquivo, histórico e opções.
+Linux: houve verificações estruturais e testes simulados; não houve
+validação nativa em uma sessão Linux.
+
+
+PRIVACIDADE E INTEGRIDADE
+
+Os pacotes distribuídos não incluem vídeos, histórico, preferências,
+cookies, tokens ou backups pessoais. Os downloads são processados
+localmente. Cookies são opcionais e devem ser usados somente no seu PC.
+
+As plataformas podem exigir login ou verificações de acesso. Consulte o
+diagnóstico no Keep quando isso ocorrer. Use os arquivos apenas quando
+você tiver autorização para baixá-los.
+
+A Release inclui SHA256SUMS.txt para conferir a integridade dos pacotes.
+As licenças dos componentes distribuídos estão na pasta licenses/.

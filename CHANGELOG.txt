@@ -2,8 +2,14 @@ KEEP — HISTÓRICO DE VERSÕES
 
 Versão atual: 2.0.0
 Notas em português brasileiro. As versões aparecem da mais recente para a
-mais antiga. As atualizações do aplicativo continuam privadas; este histórico
-não distribui pacotes de instalação, vídeos ou informações de usuários.
+mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
+GitHub. Este histórico não inclui vídeos ou informações de usuários.
+
+DOWNLOADS
+https://github.com/JoaoPPolli/keep/releases/tag/v2.0.0
+
+SITE DO KEEP
+https://joaoppolli.github.io/keep/
 
 2.0.0 — Consolidação da próxima geração do Keep
 
