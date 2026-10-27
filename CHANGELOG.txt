@@ -1,15 +1,41 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.0.1
+Versão atual: 2.1.0
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.0.1
+https://github.com/JoaoPPolli/keep/releases/tag/v2.1.0
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.1.0 — Câmera, legendas e clipes de live
+
+- Modo Cheia preservado para recortar o vídeo em uma única área vertical.
+- Modo Empilhado com áreas independentes para câmera e conteúdo: arraste,
+  redimensione ou ajuste os controles e confira a composição na prévia.
+- Altura da câmera ajustável entre 15% e 60% da saída 9:16.
+- Legendas automáticas locais em português e inglês, com progresso,
+  cancelamento e revisão do texto antes de exportar.
+- Composição e legendas acompanham o instante do vídeo original; os efeitos
+  funcionam no vídeo inteiro ou nos trechos e são gravados no MP4 exportado.
+- Clipes de lives em andamento no YouTube e na Twitch: acompanhe a transmissão
+  e salve os últimos 15, 30, 60 ou 120 segundos recebidos. O original é salvo
+  e abre na prévia para cortar, enquadrar e legendar. Captura até 720p, com áudio.
+- O acompanhamento começa quando você clica; momentos anteriores não ficam
+  disponíveis. Parar preserva o trecho recente até iniciar outra live ou fechar.
+- A abertura pelo site usa o endereço público, sem login. A antiga configuração
+  de abertura automática e a ponte de atualização privada foram removidas.
+- O primeiro uso das legendas baixa o reconhecedor Vosk e o modelo do idioma.
+  O áudio continua no computador; os componentes ficam disponíveis para reúso.
+
+A validação inclui prévia no navegador, exportação com áudio e legendas pelo
+FFmpeg, captura de live local pelo yt-dlp, cortes reordenados, preservação de texto e atualização de pacotes em
+instalações isoladas. Não houve execução nativa no Windows nesta validação.
+Confira o reconhecimento de fala antes de exportar, especialmente com ruído,
+música ou falas sobrepostas.
 
 2.0.1 — Atualizações públicas e prévia vertical
 

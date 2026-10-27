@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
-title Atualizar Keep para 2.0.1
+title Atualizar Keep para 2.1.0
 if not exist "update_keep.py" (
   echo Extraia todo o ZIP de atualizacao antes de abrir este arquivo.
   pause

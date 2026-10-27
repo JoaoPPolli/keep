@@ -34,7 +34,7 @@ JOBS = {}
 PROCESSES = {}
 PORT = 8765
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-VERSION = '2.0.1'
+VERSION = '2.1.0'
 IS_WINDOWS = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
 SETTINGS = {}
@@ -51,6 +51,8 @@ BROWSERS = ('none', 'imported', 'firefox', 'chrome', 'edge', 'brave')
 QUALITIES = ('best', '2160', '1080', '720', '480')
 PREVIEWS = None
 UPDATES = None
+SUBTITLES = None
+LIVES = None
 HTTP_SERVER = None
 
 def preference_status():
@@ -246,9 +248,9 @@ def duplicate_matches(values):
         matches = []
         for job in JOBS.values():
             try:
-                if (job.get('status') != 'complete' or job.get('mode', 'video') != mode
+                if (job.get('local_clip') or job.get('status') != 'complete' or job.get('mode', 'video') != mode
                         or job.get('quality', '1080') != quality or job.get('section') != section
-                        or job.get('edit') != edit
+                        or (requested_edit({'edit': job['edit'], 'mode': job.get('mode', 'video')}) if job.get('edit') else None) != edit
                         or source_identity(job.get('url'), job.get('video_id')) != identity
                         or completed_file_status(job['id'])['file_missing']):
                     continue
@@ -438,12 +440,13 @@ def validate_url(value):
     if host in ('youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com'):
         valid = u.path == '/watch' and bool(re.search(r'(?:^|&)v=[\w-]+(?:&|$)', u.query)) or bool(re.fullmatch(r'/(?:shorts|live|embed)/[\w-]+/?', u.path))
         platform = 'YouTube'
+        valid = valid or bool(re.fullmatch(r'/@[\w.-]+/live/?', u.path))
     elif host == 'youtu.be':
         valid, platform = bool(re.fullmatch(r'/[\w-]+/?', u.path)), 'YouTube'
     elif host in ('x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'):
         valid, platform = bool(re.fullmatch(r'/(?:[\w]+/status|i/status|i/web/status)/\d+(?:/video/[1-9]\d?)?/?', u.path)), 'X'
     elif host in ('twitch.tv', 'www.twitch.tv', 'm.twitch.tv', 'go.twitch.tv', 'clips.twitch.tv', 'player.twitch.tv'):
-        # Normalize known video/clip forms; never accept channel live streams or collections.
+        # Accept channel live streams as well as recorded videos and clips.
         clip = None
         vod = None
         if host == 'clips.twitch.tv':
@@ -464,7 +467,10 @@ def validate_url(value):
             return 'https://www.twitch.tv/videos/' + vod.group(1), 'Twitch'
         if clip:
             return 'https://clips.twitch.tv/' + slug, 'Twitch'
-        raise ValueError('Na Twitch, cole o link de um clipe ou VOD, como twitch.tv/videos/123. Links de canal e transmissões ao vivo não são aceitos.')
+        channel = re.fullmatch(r'/([A-Za-z0-9_]{1,25})/?', u.path)
+        if channel and host not in ('clips.twitch.tv', 'player.twitch.tv') and channel[1].lower() not in ('directory', 'downloads', 'settings', 'videos', 'search', 'subscriptions', 'inventory', 'wallet'):
+            return 'https://www.twitch.tv/' + channel[1], 'Twitch'
+        raise ValueError('Na Twitch, cole o link de um canal ao vivo, clipe ou VOD.')
     else:
         raise ValueError('Escolha um vídeo do YouTube ou X, ou um clipe/VOD da Twitch.')
     if not valid:
@@ -482,6 +488,12 @@ def base_command():
         command += ['--js-runtimes', 'node:' + tool_path('node')]
     if tool_path('ffmpeg'):
         command += ['--ffmpeg-location', tool_path('ffmpeg')]
+    return command
+
+def live_command():
+    command = base_command()
+    position = command.index('--match-filter')
+    del command[position:position + 2]
     return command
 
 def video_command(video_index=1, video_id=None, all_videos=False):
@@ -624,7 +636,7 @@ def friendly_error(text, platform=None):
 def metadata(url, browser='none', cookie_snapshot=None):
     url, platform = validate_url(url)
     with cookie_options(browser, url, cookie_snapshot) as options:
-        result = subprocess.run((video_command(all_videos=True) if platform == 'X' else base_command()) + options + source_arguments(url) + ['--dump-single-json', '--skip-download', '--', url], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=100, creationflags=CREATE_FLAGS, env=process_env())
+        result = subprocess.run((video_command(all_videos=True) if platform == 'X' else live_command()) + options + source_arguments(url) + ['--dump-single-json', '--skip-download', '--', url], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=100, creationflags=CREATE_FLAGS, env=process_env())
     if result.returncode:
         raise ValueError(friendly_error(result.stderr, platform))
     info = json.loads(result.stdout)
@@ -649,7 +661,7 @@ def metadata(url, browser='none', cookie_snapshot=None):
             'duration': entry.get('duration'), 'thumbnail': entry.get('thumbnail'),
             'width': dimension('width'), 'height': dimension('height'), 'fps': fps,
             'heights': sorted({f['height'] for f in entry.get('formats', []) if f.get('height') and f.get('vcodec') != 'none' and f.get('ext') != 'mhtml'}, reverse=True),
-            'live': entry.get('is_live', False)})
+            'live': entry.get('is_live') is True or entry.get('live_status') == 'is_live'})
     if not items:
         raise ValueError('Nenhum vídeo disponível foi encontrado neste post.')
     inspection_id = secrets.token_urlsafe(24)
@@ -901,9 +913,12 @@ def cleanup_job_files(id):
                 pending_final = (ROOT / job['editor_output']).absolute() if job.get('editor_output') else None
                 generated = generated and (path.name == 'result.jsonl'
                     or path.name.startswith(source_prefix) or path.name.startswith('.keep-edit-output-')
+                    or job.get('local_clip') and path.name == '.keep-live-source.mp4'
                     or recorded == path.absolute() or pending_final == path.absolute())
             if not generated:
                 continue
+            if job.get('local_clip') and path.name == '.keep-live-source.mp4' and job['status'] == 'failed':
+                continue  # Keep the trusted local source available for retry.
             if is_link(path) or path.is_dir():
                 failures.append(path.name)
                 continue
@@ -1013,6 +1028,9 @@ def dispatch_queue():
 def run_queued_job(id, cookie_snapshot=None):
     try:
         job=JOBS[id]
+        if job.get('local_clip'):
+            run_local_clip(id)
+            return
         # Paused sections saved by older versions did not persist this bound.
         if job.get('section') and job.get('platform') == 'YouTube' and job.get('source_duration') is None and not job.get('stop_request'):
             info = metadata(job['url'], job.get('browser', 'none'), cookie_snapshot)
@@ -1463,7 +1481,14 @@ def apply_job_edit(id):
         raise ValueError('A edição precisa do FFmpeg. Prepare os componentes e tente novamente.')
     info = probe_media(ffmpeg, source, process_env())
     edit, alignment_note = frame_aligned_edit(edit, info, offset=effective['start'])
-    command, note = transform_command(ffmpeg, source, temporary, edit, info, offset=effective['start'])
+    caption_work = tempfile.TemporaryDirectory(prefix='.keep-captions-', dir=folder) if edit.get('captions') else None
+    try:
+        command, note = transform_command(ffmpeg, source, temporary, edit, info, offset=effective['start'],
+                                         caption_dir=caption_work.name if caption_work else None)
+    except Exception:
+        if caption_work:
+            caption_work.cleanup()
+        raise
     note = ' '.join(value for value in (alignment_note, note) if value) or None
     process = None
     try:
@@ -1472,7 +1497,7 @@ def apply_job_edit(id):
                 return
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding='utf-8', errors='replace', creationflags=CREATE_FLAGS,
-                env=process_env(), start_new_session=IS_LINUX)
+                env=process_env(), start_new_session=IS_LINUX, cwd=caption_work.name if caption_work else None)
             process._keep_group = IS_LINUX
             PROCESSES[id] = process
             JOBS[id]['process_kind'] = 'editor'
@@ -1518,6 +1543,8 @@ def apply_job_edit(id):
     finally:
         if process and (process.poll() is None or IS_LINUX and getattr(process, '_keep_group', False)):
             terminate_process(process)
+        if caption_work:
+            caption_work.cleanup()
         if process and process.stdout:
             process.stdout.close()
         with LOCK:
@@ -1629,8 +1656,93 @@ def preview_command(request, folder):
             '-S', 'res,proto:https', '--merge-output-format', 'mkv',
             '-o', str(folder).replace('%', '%%') + os.sep + 'source.%(ext)s', '--', request['url']]
 
+
+@contextmanager
+def live_source_command(request):
+    with cookie_options(request['browser'], request['url'], request.get('cookie_snapshot')) as options:
+        yield live_command() + options + [
+            '--no-simulate', '--no-progress', '--no-warnings', '--hls-use-mpegts', '--no-live-from-start',
+            '--downloader', 'ffmpeg', '-f', 'b[height<=720][protocol^=m3u8]/b[height<=720]/b',
+            '-o', '-', '--', request['url']]
+
+
+def save_live_clip(path, info, source, body=None):
+    """Save an original, or queue an edit from a capability-checked local clip."""
+    body = body or {}
+    mode = body.get('mode', 'video')
+    quality = body.get('quality', '720')
+    if mode not in ('video', 'audio', 'gif') or quality not in QUALITIES:
+        raise ValueError('Escolha um formato e uma qualidade válidos.')
+    custom_name = validate_custom_name(body.get('custom_name'))
+    edit = requested_edit(body, info['duration'])
+    if not edit and (mode != 'video' or body.get('section')):
+        section = validate_section(body.get('section'), info['duration']) or {'start': 0, 'end': info['duration']}
+        edit = validate_edit({'sections': [section], 'mode': mode}, info['duration'])
+    created = time.time()
+    title = str(source.get('title') or 'Clipe da live')[:150]
+    url, platform = validate_url(source['url'])
+    with LOCK:
+        if SHUTTING_DOWN:
+            raise ValueError('O Keep está fechando. Abra novamente para salvar clipes.')
+        root = download_root()
+        if preference_status()['platform_folders']:
+            root = root / platform
+        folder = create_download_directory(root, title, platform, created)
+        id = secrets.token_hex(8)
+        (folder / '.keep-job.json').write_text(json.dumps({'id': id}), encoding='utf-8')
+        job = {'id': id, 'url': url, 'platform': platform, 'title': title, 'browser': 'none',
+               'mode': mode, 'quality': quality, 'source_duration': info['duration'], 'edit': edit,
+               'section': edit_bounds(edit) if edit else None, 'custom_name': custom_name,
+               'directory': stored_path(folder), 'managed_root': stored_path(root),
+               'created': created, 'queue_order': created, 'local_clip': True, 'progress': 0,
+               'status': 'queued' if edit else 'complete', 'stage': 'Na fila' if edit else 'Pronto'}
+        JOBS[id] = job
+        try:
+            if edit:
+                shutil.copyfile(path, folder / '.keep-live-source.mp4')
+            else:
+                target = folder / editor_final_name(job, folder)
+                publish_editor_output(path, target)
+                job.update(file=stored_path(target), filename=target.name, bytes=target.stat().st_size,
+                           progress=100, completed=created)
+                record_latest_download(job, folder)
+            persist()
+        except Exception:
+            job.update(status='failed', stage='Não foi possível salvar o clipe', error='Confira a pasta dos downloads e tente novamente.')
+            persist()
+            raise
+    if edit:
+        dispatch_queue()
+    else:
+        notify_completed_job(id)
+    return {'id': id, 'status': job['status']}
+
+
+def run_local_clip(id):
+    with LOCK:
+        job = JOBS[id]
+        folder = checked_job_directory(id)
+        original = folder / '.keep-live-source.mp4'
+        if any(is_link(p) for p in (original, *original.parents)) or not original.is_file():
+            raise ValueError('O original temporário do clipe não está disponível. Crie outro clipe na live.')
+        source = folder / ('.keep-edit-source-' + id + '.mp4')
+        if is_link(source):
+            raise ValueError('A origem temporária do clipe contém um vínculo. Escolha outra pasta.')
+        shutil.copyfile(original, source)
+        # The source is the entire local clip, with timestamps beginning at 0.
+        update_job(id, file=stored_path(source), filename=source.name,
+                   effective_section={'start': 0, 'end': job['source_duration']}, stage='Editando clipe da live')
+    apply_job_edit(id)
+    with LOCK:
+        if not job.get('stop_request') and job['status'] == 'downloading':
+            update_job(id, status='complete', progress=100, stage='Pronto', completed=time.time())
+            original.unlink(missing_ok=True)
+            record_latest_download(job, folder)
+            notify_completed_job(id)
+
+
 def ensure_services():
-    global PREVIEWS, UPDATES
+    global PREVIEWS, UPDATES, SUBTITLES, LIVES
     with LOCK:
         if PREVIEWS is None:
             from preview_media import PreviewManager
@@ -1640,6 +1752,12 @@ def ensure_services():
         if UPDATES is None:
             from app_updates import UpdateManager
             UPDATES = UpdateManager(ROOT, VERSION, 'windows' if IS_WINDOWS else 'linux', PORT)
+        if SUBTITLES is None:
+            from preview_media import SubtitleManager
+            SUBTITLES = SubtitleManager(ROOT, tool_path('ffmpeg'), process_env=process_env)
+        if LIVES is None:
+            from preview_media import LiveManager
+            LIVES = LiveManager(DATA / 'lives', live_source_command, tool_path('ffmpeg'), process_env)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
@@ -1724,6 +1842,18 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(200, PREVIEWS.status(parse_qs(urlparse(self.path).query).get('id', [''])[0]))
                 except (ValueError, KeyError):
                     return self.respond(404, {'error': 'Prévia não encontrada. Prepare-a novamente.'})
+            if path == '/api/subtitles':
+                ensure_services()
+                try:
+                    return self.respond(200, SUBTITLES.status(parse_qs(urlparse(self.path).query).get('id', [''])[0]))
+                except ValueError as error:
+                    return self.respond(404, {'error': str(error)})
+            if path == '/api/live':
+                ensure_services()
+                try:
+                    return self.respond(200, LIVES.status(parse_qs(urlparse(self.path).query).get('id', [''])[0]))
+                except ValueError as error:
+                    return self.respond(404, {'error': str(error)})
             if path == '/api/update':
                 ensure_services()
                 return self.respond(200, UPDATES.snapshot())
@@ -1765,7 +1895,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get('Content-Length', '0'))
             limit = (8 * 1024 * 1024 if self.path == '/api/update/receive' else 2 * MAX_COOKIE_BYTES
-                     if self.path == '/api/cookies/import' else 64 * 1024 if self.path == '/api/settings/import' else 8192)
+                     if self.path == '/api/cookies/import' else 1024 * 1024 if self.path in ('/api/download', '/api/duplicates')
+                     else 64 * 1024 if self.path == '/api/settings/import' else 8192)
             if not 0 < length <= limit:
                 raise ValueError('Tamanho de solicitação inválido.')
             # Drain the bounded body before rejecting to avoid a TCP reset on Windows.
@@ -1815,6 +1946,45 @@ class Handler(BaseHTTPRequestHandler):
                 request = {'url': url, 'platform': platform, 'browser': browser, 'cookie_snapshot': snapshot,
                     'video_index': info.get('video_index', 1), 'video_id': info.get('video_id') if platform == 'X' else None}
                 return self.respond(202, PREVIEWS.create(request, duration=info.get('duration')))
+            if self.path == '/api/live/start':
+                ensure_services()
+                if SHUTTING_DOWN:
+                    raise ValueError('O Keep está fechando.')
+                url, platform = validate_url(body.get('url'))
+                browser = body.get('browser', preference_status()['default_browser'])
+                snapshot = imported_cookie_text(browser, url)
+                # Recheck: cached inspection may outlive the transmission.
+                info = metadata(url, browser, snapshot)
+                if not info.get('live') or platform not in ('YouTube', 'Twitch'):
+                    raise ValueError('Este link não está transmitindo ao vivo no YouTube ou na Twitch.')
+                return self.respond(202, LIVES.start({'url': url, 'browser': browser,
+                    'cookie_snapshot': snapshot, 'info': info}))
+            if self.path == '/api/live/stop':
+                ensure_services()
+                return self.respond(200, LIVES.stop(body.get('id')))
+            if self.path == '/api/live/clip':
+                ensure_services()
+                source = LIVES.source(body.get('id'))
+                def consume_clip(path, info):
+                    preview = PREVIEWS.import_clip(path)
+                    job = save_live_clip(path, info, source)
+                    return {'preview': preview, 'job': job, 'video': {
+                        'url': source['url'], 'platform': source['platform'], 'kind': 'Clipe da live',
+                        'title': str(source['title'])[:140] + ' · clipe', 'creator': source.get('creator'),
+                        'video_index': 1, 'duration': info['duration'], 'width': info['width'],
+                        'height': info['height'], 'fps': info.get('fps'), 'heights': [info['height']],
+                        'live': False}}
+                return self.respond(200, LIVES.clip(body.get('id'), body.get('seconds', 30), consume_clip))
+            if self.path == '/api/subtitles':
+                ensure_services()
+                preview_id = body.get('preview_id')
+                source = PREVIEWS.media_file(preview_id, body.get('key'))
+                preview_info = PREVIEWS.status(preview_id)
+                return self.respond(202, SUBTITLES.create(source, language=body.get('language', 'pt'),
+                    preview_id=preview_id, duration=preview_info.get('duration')))
+            if self.path == '/api/subtitles/cancel':
+                ensure_services()
+                return self.respond(200, SUBTITLES.cancel(body.get('id')))
             if self.path == '/api/preview/cancel':
                 ensure_services()
                 PREVIEWS.cancel(body.get('id'))
@@ -1831,6 +2001,8 @@ class Handler(BaseHTTPRequestHandler):
                 if operation == 'receive':
                     return self.respond(200, UPDATES.receive(body.get('package_base64'), filename=body.get('filename')))
                 if operation == 'rollback':
+                    if LIVES is not None and LIVES.busy():
+                        raise ValueError('Pare o acompanhamento da live e aguarde o clipe antes de restaurar.')
                     if body.get('confirm') is not True:
                         raise ValueError('Confirme que deseja preparar o retorno à versão anterior.')
                     with LOCK:
@@ -1840,6 +2012,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError('Pause ou aguarde os downloads em andamento antes de preparar a restauração. A fila e os pausados serão mantidos.')
                         return self.respond(200, UPDATES.prepare_rollback(body.get('id')))
                 if operation == 'apply':
+                    if LIVES is not None and LIVES.busy():
+                        raise ValueError('Pare o acompanhamento da live e aguarde o clipe antes de atualizar.')
                     with LOCK:
                         if SHUTTING_DOWN:
                             raise ValueError('O Keep já está fechando para atualizar. Aguarde o reinício.')
@@ -1867,6 +2041,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/queue/reorder':
                 return self.respond(200, reorder_queue(body.get('ids')))
             if self.path == '/api/duplicates':
+                if body.get('clip'):
+                    return self.respond(200, {'matches': []})
                 return self.respond(200, {'matches': duplicate_matches(body)})
             if self.path == '/api/diagnostic':
                 return self.respond(200, diagnostic_report(body.get('id')))
@@ -1901,6 +2077,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/inspect':
                 return self.respond(200, metadata(body.get('url'), body.get('browser', 'none')))
             if self.path == '/api/download':
+                if body.get('clip') is not None:
+                    ensure_services()
+                    clip = body['clip']
+                    if not isinstance(clip, dict):
+                        raise ValueError('Crie um clipe da live antes de salvar uma edição.')
+                    source = PREVIEWS.live_file(clip.get('id'), clip.get('key'))
+                    info = probe_media(tool_path('ffmpeg'), source, process_env())
+                    return self.respond(202, save_live_clip(source, info, body, body))
                 url, platform = validate_url(body.get('url'))
                 mode, quality = body.get('mode', 'video'), body.get('quality', '1080')
                 if mode not in ('video', 'audio', 'gif') or quality not in ('best', '2160', '1080', '720', '480'):
@@ -2065,6 +2249,10 @@ def serve():
         pass
     finally:
         shutdown_downloads()
+        if LIVES is not None:
+            LIVES.close()
+        if SUBTITLES is not None:
+            SUBTITLES.close()
         if PREVIEWS is not None:
             PREVIEWS.close()
         server.server_close()

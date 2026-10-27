@@ -37,6 +37,14 @@ NOTES = {
         'Aviso no app quando uma versão mais recente estiver disponível.',
         'Prévia do resultado vertical 9:16 enquanto você ajusta o enquadramento.',
     ],
+    '2.1.0': [
+        'Clipes de lives do YouTube e da Twitch: acompanhe e salve até dois minutos recentes para editar.',
+        'Abertura pelo site público sem login e remoção da configuração automática privada.',
+        'Modo Empilhado: escolha a área da câmera e do conteúdo, com posição e tamanho independentes.',
+        'Ajuste a altura da câmera na composição vertical; o modo Cheia continua disponível.',
+        'Legendas automáticas locais em português e inglês, com revisão do texto antes de exportar.',
+        'Confira câmera, conteúdo e legendas na prévia sincronizada, no vídeo inteiro ou nos trechos.',
+    ],
 }
 
 

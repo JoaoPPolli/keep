@@ -14,7 +14,9 @@ let batchRunning=false,batchCancel=false,batchSource='',batchEntries=[],batchNex
 let editSections=[],previewFPS=null,previewDimensions=null,previewFrameTimes=null,previewFrameNote='',cropDrag=null,frameSeekBusy=false;
 let retryEditor=null,retryDownloadOptions=null;
 let cropFrameCallback=null,cropAnimationFrame=null;
-let desktopStatus=null,desktopWorking=false,restorePoints=[],restoringPoint=false,hostedLaunchAttempted=false;
+let editorLayout='full',editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};
+let captionTask='',captionState='idle',captionCues=[],captionBinding='',captionTimer,captionGeneration=0,pendingCaptionCues=null;
+let desktopStatus=null,desktopWorking=false,restorePoints=[],restoringPoint=false;
 const icons = {YouTube:'yt', X:'x', Twitch:'twitch'};
 const icon = name => `<svg aria-hidden="true"><use href="#${name}"/></svg>`;
 const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -62,20 +64,24 @@ function updateSection() {
   const audio=$('format').value==='audio',gif=$('format').value==='gif',count=selectedItems().length;
   if(gif&&count===1&&Number(current?.duration)>0&&session?.ffmpeg)$('download-scope').value='section';
   const partial=$('download-scope').value==='section';
-  if(!partial&&(previewId||$('prepare-preview').disabled))resetPreview();
+
   $('section-fields').hidden = !partial;
-  $('cut-preview').hidden = !partial;
+  $('cut-preview').hidden = audio||count!==1||!Number(current?.duration);
   $('multi-section-editor').hidden=!partial;
+  for(const id of ['mark-start','mark-end','play-section'])$(id).hidden=!partial;
   $('timeline').hidden=!partial;
-  $('quality').disabled = audio||gif;
+  $('quality').disabled = audio||gif||!!current?.clip;
+  if(current?.clip)$('quality-note').textContent='Este clipe usa a qualidade capturada, até 720p. O original já está em Meus downloads.';
   $('scope-full').disabled=gif;
   $('custom-name-hint').textContent='Digite o nome sem extensão. O Keep adiciona '+(gif?'GIF':audio?'MP3':'MP4')+'. Cada download continua em sua própria pasta.';
   $('section-output-note').hidden=!partial||$('section-output').value!=='join'||editSections.length<2;
   const number=partial&&editSections.length>1&&$('section-output').value==='separate'?editSections.length:count;
   $('download-button').innerHTML=icon('download')+(gif?(number>1?`Criar ${number} GIFs`:'Criar GIF'):number>1?`Baixar ${number} ${audio?'áudios':'vídeos'}`:partial?($('section-output').value==='join'&&editSections.length>1?'Baixar montagem':audio?'Baixar áudio do trecho':'Baixar trecho'):audio?'Baixar áudio':'Baixar vídeo');
   $('section-summary').classList.remove('invalid');
-  let valid = true;
+  let valid = !current?.clip || !!current.clip.key;
   try {
+    if(captionsEnabled()){if(count!==1)throw new Error('Selecione apenas um vídeo para legendar.');captionExportReady();}
+    if(verticalEnabled()&&count!==1)throw new Error('Selecione apenas um vídeo para reenquadrar.');
     if(gif&&!partial)throw new Error('Selecione um único vídeo gravado com duração informada para criar um GIF.');
     const sections=plannedSections();
     if(sections){
@@ -115,6 +121,7 @@ function configureSection(section) {
 }
 function resetEditor() {
  editSections=[];previewFPS=null;previewDimensions=null;previewFrameTimes=null;previewFrameNote='';cropDrag=null;frameSeekBusy=false;
+ editorLayout='full';pendingCaptionCues=null;editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};$('camera-height').value='30';$('region-select').value='camera';syncRegionFields();$('captions-enabled').checked=false;resetCaptionState();
  $('vertical-enabled').checked=false;$('crop-x').value='50';$('crop-y').value='50';$('section-output').value='separate';
  renderSections();
 }
@@ -196,19 +203,31 @@ function videoDimensions() {
  return width>0&&height>0?{width,height}:null;
 }
 function alreadyVertical() {const dimensions=videoDimensions();return!!dimensions&&Math.abs(dimensions.width/dimensions.height-9/16)<.015;}
-function verticalEnabled() {return $('format').value==='video'&&$('vertical-enabled').checked&&!alreadyVertical();}
+function verticalEnabled() {return $('format').value==='video'&&$('vertical-enabled').checked&&(editorLayout==='stacked'||!alreadyVertical());}
+function captionsEnabled() {return $('format').value==='video'&&$('captions-enabled').checked;}
+function outputPreviewEnabled() {return verticalEnabled()||captionsEnabled();}
 function updateVertical() {
- const dimensions=videoDimensions(),native=alreadyVertical(),video=$('format').value==='video';
- if(native)$('vertical-enabled').checked=false;
- $('vertical-enabled').disabled=!video||native||selectedItems().length!==1||!dimensions;
- $('vertical-note').textContent=!video?'O enquadramento vertical está disponível para vídeo MP4.':native?'Este vídeo já está em 9:16. Você pode recortar os horários sem converter o enquadramento.':!dimensions?'A plataforma não informou as dimensões. Prepare a prévia para conferir o enquadramento.':'Ative para escolher uma área vertical da imagem. O restante da imagem será cortado.';
- const enabled=verticalEnabled();$('crop-controls').hidden=!enabled;$('crop-overlay').toggleAttribute('hidden',!enabled||!$('preview-player').readyState);
+ const dimensions=videoDimensions(),native=alreadyVertical(),video=$('format').value==='video',single=selectedItems().length===1;
+ if(native&&editorLayout==='full')$('vertical-enabled').checked=false;
+ $('vertical-enabled').disabled=!video||(native&&editorLayout==='full')||!single||!dimensions;
+ $('vertical-layout-options').hidden=!video||!single||!dimensions;
+ for(const layout of ['full','stacked']){const button=$('vertical-layout-'+layout);button.classList.toggle('active',editorLayout===layout);button.setAttribute('aria-pressed',String(editorLayout===layout));}
+ $('vertical-note').textContent=!video?'O enquadramento vertical está disponível para vídeo MP4.':native&&editorLayout==='full'?'Este vídeo já está em 9:16. O modo Cheia mantém seu enquadramento; você também pode escolher Empilhado.':!dimensions?'A plataforma não informou as dimensões. Prepare a prévia para conferir o enquadramento.':editorLayout==='stacked'?'Escolha a área da câmera e a do conteúdo no vídeo original. O resultado coloca a câmera acima do conteúdo.':'Ative para escolher uma área vertical da imagem. O restante da imagem será cortado.';
+ const enabled=verticalEnabled(),stacked=enabled&&editorLayout==='stacked';
+ $('crop-controls').hidden=!enabled;$('full-crop-controls').hidden=stacked;$('stacked-crop-controls').hidden=!stacked;
+ $('crop-overlay').toggleAttribute('hidden',!enabled||!$('preview-player').readyState);
+ $('crop-frame').toggleAttribute('hidden',stacked);$('crop-drag-handle').toggleAttribute('hidden',stacked);$('crop-shade').toggleAttribute('hidden',stacked);$('stacked-regions').toggleAttribute('hidden',!stacked);
+ $('crop-instructions').textContent=stacked?'Marque a câmera em rosa e o conteúdo em azul. Arraste as bordas e redimensione pelos quadrados; confira o resultado ao lado.':'Arraste a borda verde no original ou ajuste os controles para escolher a área que será mantida.';
  $('crop-x-value').textContent=Math.round(Number($('crop-x').value))+'%';$('crop-y-value').textContent=Math.round(Number($('crop-y').value))+'%';
- $('vertical-preview-note').textContent=enabled?($('preview-player').readyState>=2?'Confira o resultado 9:16 ao lado do original. A prévia acompanha a reprodução e os ajustes.':'Prepare a prévia abaixo para ver o resultado do enquadramento antes de baixar.'):'A prévia vertical acompanha o mesmo instante do vídeo original.';
- $('preview-comparison').classList.toggle('vertical-active',enabled);
- $('crop-source-label').hidden=!enabled;
- $('vertical-output').hidden=!enabled;
- updateCropOverlay();drawVerticalPreview();scheduleVerticalPreview();
+ $('camera-height-value').textContent=Math.round(Number($('camera-height').value))+'%';
+ $('vertical-preview-note').textContent=enabled?($('preview-player').readyState>=2?'Confira o resultado ao lado do original. A prévia acompanha a reprodução e os ajustes.':'Prepare a prévia abaixo para ver o resultado do enquadramento antes de baixar.'):'A prévia acompanha o mesmo instante do vídeo original.';
+ const output=outputPreviewEnabled();
+ $('preview-comparison').classList.toggle('vertical-active',enabled);$('preview-comparison').classList.toggle('captions-active',captionsEnabled());
+ $('crop-source-label').hidden=!output;$('crop-source-label').textContent=stacked?'Original · câmera rosa e conteúdo azul':enabled?'Original · arraste a borda verde':'Original · sem legendas';
+ $('vertical-output').hidden=!output;$('stack-divider').hidden=!stacked;
+ $('stack-divider').style.top=String(Number($('camera-height').value))+'%';
+ $('output-preview-heading').textContent=enabled?'Resultado · 9:16'+(stacked?' empilhado':''):'Resultado · com legendas';
+ renderCaptionState();updateCropOverlay();drawVerticalPreview();scheduleVerticalPreview();
 }
 function cropPixels(width,height,x,y) {
  // Match the 18 x 32 crop units and even pixel positions used by FFmpeg.
@@ -225,6 +244,25 @@ function cropGeometry() {
  if(!crop)return null;
  return{rect,image,frame:{x:image.x+image.width*crop.x/source.width,y:image.y+image.height*crop.y/source.height,width:image.width*crop.width/source.width,height:image.height*crop.height/source.height}};
 }
+function stackedGeometry(width,height,camera,content,share) {
+ const even=value=>2*Math.floor(value/2),unit=Math.floor(Math.min(width,1080)/18),w=18*unit,h=32*unit;
+ if(unit<1)return null;
+ const cameraHeight=even(h*share),contentHeight=h-cameraHeight;
+ const cover=(region,paneHeight)=>{
+  const left=even(region.x*width),top=even(region.y*height),rw=Math.min(even(region.width*width),even(width-left)),rh=Math.min(even(region.height*height),even(height-top));
+  let cw=rw,ch=rh;if(rw/rh>w/paneHeight)cw=even(rh*w/paneHeight);else ch=even(rw*paneHeight/w);
+  if(cw<2||ch<2)return null;
+  return{x:left+even((rw-cw)/2),y:top+even((rh-ch)/2),width:cw,height:ch};
+ };
+ const a=cover(camera,cameraHeight),b=cover(content,contentHeight);if(!a||!b)return null;
+ return{width:w,height:h,camera_height:cameraHeight,content_height:contentHeight,camera:a,content:b};
+}
+function currentStackGeometry() {const d=videoDimensions();return d&&stackedGeometry(d.width,d.height,editorRegions.camera,editorRegions.content,Number($('camera-height').value)/100);}
+function syncRegionFields() {const region=editorRegions[$('region-select').value];for(const key of ['x','y','width','height'])$('region-'+key).value=String(Math.round(region[key]*1000)/10);}
+function normalizeRegion(region) {
+ const width=Math.max(.05,Math.min(1,region.width)),height=Math.max(.05,Math.min(1,region.height));
+ return{x:Math.max(0,Math.min(1-width,region.x)),y:Math.max(0,Math.min(1-height,region.y)),width,height};
+}
 function stopVerticalPreview() {
  const player=$('preview-player');
  if(cropFrameCallback!==null&&player.cancelVideoFrameCallback)player.cancelVideoFrameCallback(cropFrameCallback);
@@ -232,60 +270,184 @@ function stopVerticalPreview() {
  cropFrameCallback=cropAnimationFrame=null;
 }
 function clearVerticalPreview() {
- stopVerticalPreview();
- const canvas=$('vertical-preview'),context=canvas.getContext('2d');
+ stopVerticalPreview();const canvas=$('vertical-preview'),context=canvas.getContext('2d');
  if(context)context.clearRect(0,0,canvas.width,canvas.height);
- canvas.hidden=true;$('vertical-preview-empty').hidden=false;
- $('vertical-preview-empty').textContent='Aguardando a imagem da prévia…';
+ canvas.hidden=true;$('vertical-preview-empty').hidden=false;$('vertical-preview-empty').textContent='Aguardando a imagem da prévia…';
+}
+function wrapCaptionText(text) {
+ const words=String(text).trim().replace(/\s+/g,' ').split(' ').filter(Boolean),lines=[];let line='';
+ for(const word of words){if(line&&Array.from(line+' '+word).length>32){lines.push(line);line=word;}else line+=(line?' ':'')+word;}
+ if(line)lines.push(line);
+ return lines.length>2?[lines[0],lines.slice(1).join(' ')]:lines;
+}
+function drawPreviewCaptions(context,width,height,time) {
+ if(!captionsEnabled()||captionState!=='ready'||captionBinding!==previewId)return;
+ const cue=captionCues.find(item=>time>=item.start&&time<item.end);if(!cue||!cue.text.trim())return;
+ const lines=wrapCaptionText(cue.text),scale=Math.min(1,32/Math.max(1,...lines.map(line=>Array.from(line).length))),font=width*.052*scale;
+ context.save();context.font='bold '+font+'px Arial, "Liberation Sans", sans-serif';context.textAlign='center';context.textBaseline='bottom';context.lineJoin='round';context.strokeStyle='#000';context.fillStyle='#fff';context.lineWidth=font*.09;
+ lines.forEach((line,index)=>{const y=height*.92-(lines.length-1-index)*font*1.2;context.strokeText(line,width/2,y);context.fillText(line,width/2,y);});context.restore();
 }
 function drawVerticalPreview() {
  const player=$('preview-player'),canvas=$('vertical-preview'),source=videoDimensions();
- if(!verticalEnabled()||$('preview-player-wrap').hidden||player.readyState<2||!player.videoWidth||!player.videoHeight||!source){clearVerticalPreview();return;}
- const crop=cropPixels(source.width,source.height,Number($('crop-x').value)/100,Number($('crop-y').value)/100);
- if(!crop){clearVerticalPreview();$('vertical-preview-empty').textContent='Este vídeo é pequeno demais para gerar a prévia 9:16.';return;}
+ if(!outputPreviewEnabled()||$('preview-player-wrap').hidden||player.readyState<2||!player.videoWidth||!player.videoHeight||!source){clearVerticalPreview();return;}
+ const vertical=verticalEnabled(),stacked=vertical&&editorLayout==='stacked',geometry=stacked?currentStackGeometry():null;
+ const crop=vertical&&!stacked?cropPixels(source.width,source.height,Number($('crop-x').value)/100,Number($('crop-y').value)/100):{x:0,y:0,width:source.width,height:source.height};
+ if(!crop||(stacked&&!geometry)){clearVerticalPreview();$('vertical-preview-empty').textContent='A área escolhida é pequena demais. Aumente o enquadramento.';return;}
+ const width=360,height=vertical?640:Math.max(2,Math.round(width*source.height/source.width));
+ if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+ $('output-preview-screen').style.aspectRatio=String(width)+' / '+String(height);
  const context=canvas.getContext('2d');if(!context)return;
- if(canvas.width!==360||canvas.height!==640){canvas.width=360;canvas.height=640;}
+ const draw=(r,x,y,w,h)=>context.drawImage(player,r.x/source.width*player.videoWidth,r.y/source.height*player.videoHeight,r.width/source.width*player.videoWidth,r.height/source.height*player.videoHeight,x,y,w,h);
  try{
-   context.drawImage(player,crop.x/source.width*player.videoWidth,crop.y/source.height*player.videoHeight,crop.width/source.width*player.videoWidth,crop.height/source.height*player.videoHeight,0,0,canvas.width,canvas.height);
-   canvas.hidden=false;$('vertical-preview-empty').hidden=true;
- }catch{clearVerticalPreview();$('vertical-preview-empty').textContent='Não foi possível desenhar este quadro. Tente preparar a prévia novamente.';}
+  if(stacked){const top=height*geometry.camera_height/geometry.height;draw(geometry.camera,0,0,width,top);draw(geometry.content,0,top,width,height-top);}else draw(crop,0,0,width,height);
+  drawPreviewCaptions(context,width,height,player.currentTime);canvas.hidden=false;$('vertical-preview-empty').hidden=true;
+ }catch{clearVerticalPreview();$('vertical-preview-empty').textContent='Não foi possível desenhar este quadro. Prepare a prévia novamente.';}
 }
-// Loading and seeking can finish before the decoded frame reaches the compositor.
-// Allow one frame callback while paused; the next ordinary call stops the loop.
+// A paused load/seek still needs one decoded compositor frame, never an idle loop.
 function scheduleVerticalPreview(force=false) {
  const player=$('preview-player');
- if(!verticalEnabled()||(!force&&player.paused)||player.ended||$('preview-player-wrap').hidden){stopVerticalPreview();return;}
+ if(!outputPreviewEnabled()||(!force&&player.paused)||player.ended||$('preview-player-wrap').hidden){stopVerticalPreview();return;}
  if(cropFrameCallback!==null||cropAnimationFrame!==null)return;
  const next=()=>{cropFrameCallback=cropAnimationFrame=null;drawVerticalPreview();scheduleVerticalPreview();};
- if(player.requestVideoFrameCallback)cropFrameCallback=player.requestVideoFrameCallback(next);
- else cropAnimationFrame=requestAnimationFrame(next);
+ if(player.requestVideoFrameCallback)cropFrameCallback=player.requestVideoFrameCallback(next);else cropAnimationFrame=requestAnimationFrame(next);
 }
 function updateCropOverlay() {
  if($('crop-overlay').hasAttribute('hidden'))return;
  const data=cropGeometry();if(!data)return;const{rect,image,frame}=data;
  $('crop-overlay').setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);
- $('crop-shade').setAttribute('d',`M${image.x},${image.y}h${image.width}v${image.height}h-${image.width}Z M${frame.x},${frame.y}h${frame.width}v${frame.height}h-${frame.width}Z`);
- for(const id of ['crop-frame','crop-drag-handle'])for(const key of ['x','y','width','height'])$(id).setAttribute(key,String(frame[key]));
+ if(editorLayout==='stacked'){
+  for(const name of ['camera','content']){
+   const r=editorRegions[name],f={x:image.x+image.width*r.x,y:image.y+image.height*r.y,width:image.width*r.width,height:image.height*r.height};
+   for(const suffix of ['frame','drag-handle'])for(const key of ['x','y','width','height'])$(name+'-'+suffix).setAttribute(key,String(f[key]));
+   $(name+'-resize-handle').setAttribute('x',String(f.x+f.width-6));$(name+'-resize-handle').setAttribute('y',String(f.y+f.height-6));
+   $(name+'-label').setAttribute('x',String(f.x+5));$(name+'-label').setAttribute('y',String(f.y+17));
+  }
+ }else{
+  $('crop-shade').setAttribute('d',`M${image.x},${image.y}h${image.width}v${image.height}h-${image.width}Z M${frame.x},${frame.y}h${frame.width}v${frame.height}h-${frame.width}Z`);
+  for(const id of ['crop-frame','crop-drag-handle'])for(const key of ['x','y','width','height'])$(id).setAttribute(key,String(frame[key]));
+ }
 }
-$('vertical-enabled').addEventListener('change',()=>{updateVertical();updateSection();});
+$('vertical-enabled').addEventListener('change',updateSection);
+for(const layout of ['full','stacked'])$('vertical-layout-'+layout).addEventListener('click',()=>{editorLayout=layout;$('vertical-enabled').checked=true;syncRegionFields();updateSection();});
 ['crop-x','crop-y'].forEach(id=>$(id).addEventListener('input',updateVertical));
 $('center-crop').addEventListener('click',()=>{$('crop-x').value='50';$('crop-y').value='50';updateVertical();});
+$('region-select').addEventListener('change',syncRegionFields);
+for(const key of ['x','y','width','height'])$('region-'+key).addEventListener('input',()=>{
+ if(!$('region-'+key).value.trim())return;const value=Number($('region-'+key).value);if(!Number.isFinite(value))return;
+ const name=$('region-select').value;editorRegions[name]=normalizeRegion({...editorRegions[name],[key]:value/100});updateVertical();
+});
+for(const key of ['x','y','width','height'])$('region-'+key).addEventListener('change',syncRegionFields);
+$('camera-height').addEventListener('input',updateVertical);
 $('crop-drag-handle').addEventListener('pointerdown',event=>{
- if(!verticalEnabled())return;const data=cropGeometry();if(!data)return;event.preventDefault();
- cropDrag={pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:Number($('crop-x').value)/100,y:Number($('crop-y').value)/100,travelX:data.image.width-data.frame.width,travelY:data.image.height-data.frame.height};
- event.target.setPointerCapture(event.pointerId);
+ if(!verticalEnabled()||editorLayout!=='full')return;const data=cropGeometry();if(!data)return;event.preventDefault();
+ cropDrag={pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:Number($('crop-x').value)/100,y:Number($('crop-y').value)/100,travelX:data.image.width-data.frame.width,travelY:data.image.height-data.frame.height};event.target.setPointerCapture(event.pointerId);
 });
 $('crop-drag-handle').addEventListener('pointermove',event=>{
- if(!cropDrag||event.pointerId!==cropDrag.pointerId)return;event.preventDefault();
- const clamp=value=>Math.max(0,Math.min(1,value));
- $('crop-x').value=String(clamp(cropDrag.x+(cropDrag.travelX?(event.clientX-cropDrag.clientX)/cropDrag.travelX:0))*100);
- $('crop-y').value=String(clamp(cropDrag.y+(cropDrag.travelY?(event.clientY-cropDrag.clientY)/cropDrag.travelY:0))*100);updateVertical();
+ if(!cropDrag||cropDrag.region||event.pointerId!==cropDrag.pointerId)return;event.preventDefault();const clamp=value=>Math.max(0,Math.min(1,value));
+ $('crop-x').value=String(clamp(cropDrag.x+(cropDrag.travelX?(event.clientX-cropDrag.clientX)/cropDrag.travelX:0))*100);$('crop-y').value=String(clamp(cropDrag.y+(cropDrag.travelY?(event.clientY-cropDrag.clientY)/cropDrag.travelY:0))*100);updateVertical();
 });
-for(const event of ['pointerup','pointercancel','lostpointercapture'])$('crop-drag-handle').addEventListener(event,()=>{cropDrag=null;});
+for(const name of ['camera','content'])for(const mode of ['drag','resize']){
+ const handle=$(name+'-'+(mode==='drag'?'drag-handle':'resize-handle'));
+ handle.addEventListener('pointerdown',event=>{
+  if(!verticalEnabled()||editorLayout!=='stacked')return;const data=cropGeometry();if(!data)return;event.preventDefault();event.stopPropagation();$('region-select').value=name;syncRegionFields();
+  cropDrag={pointerId:event.pointerId,region:name,mode,clientX:event.clientX,clientY:event.clientY,initial:{...editorRegions[name]},image:data.image};handle.setPointerCapture(event.pointerId);
+ });
+ handle.addEventListener('pointermove',event=>{
+  if(!cropDrag||cropDrag.region!==name||event.pointerId!==cropDrag.pointerId)return;event.preventDefault();
+  const dx=(event.clientX-cropDrag.clientX)/cropDrag.image.width,dy=(event.clientY-cropDrag.clientY)/cropDrag.image.height,r=cropDrag.initial;
+  editorRegions[name]=normalizeRegion(mode==='resize'?{...r,width:Math.max(.05,Math.min(1-r.x,r.width+dx)),height:Math.max(.05,Math.min(1-r.y,r.height+dy))}:{...r,x:r.x+dx,y:r.y+dy});syncRegionFields();updateVertical();
+ });
+ for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,()=>{cropDrag=null;});
+}
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('crop-drag-handle').addEventListener(type,()=>{cropDrag=null;});
+let dividerDrag=null;
+$('stack-divider').addEventListener('pointerdown',event=>{event.preventDefault();dividerDrag=event.pointerId;$('stack-divider').setPointerCapture(event.pointerId);});
+$('stack-divider').addEventListener('pointermove',event=>{if(dividerDrag!==event.pointerId)return;const box=$('output-preview-screen').getBoundingClientRect();$('camera-height').value=String(Math.max(15,Math.min(60,(event.clientY-box.top)/box.height*100)));updateVertical();});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('stack-divider').addEventListener(type,()=>{dividerDrag=null;});
+$('stack-divider').addEventListener('keydown',event=>{if(!['ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();$('camera-height').value=String(Math.max(15,Math.min(60,Number($('camera-height').value)+(event.key==='ArrowDown'?1:-1))));updateVertical();});
 window.addEventListener('resize',updateCropOverlay);
-for(const event of ['loadeddata','seeked','timeupdate','pause','ended'])$('preview-player').addEventListener(event,()=>{drawVerticalPreview();scheduleVerticalPreview(event==='loadeddata'||event==='seeked');});
-$('preview-player').addEventListener('play',scheduleVerticalPreview);
+for(const event of ['loadeddata','seeked','timeupdate','pause','ended'])$('preview-player').addEventListener(event,()=>{drawVerticalPreview();scheduleVerticalPreview(event==='loadeddata'||event==='seeked');renderCaptionState();});
+$('preview-player').addEventListener('play',()=>scheduleVerticalPreview());
 for(const event of ['emptied','error'])$('preview-player').addEventListener(event,clearVerticalPreview);
+function validCaptionCues(cues,duration=Number(current?.duration)) {
+ if(!Array.isArray(cues)||cues.length>4000||!Number.isFinite(duration)||duration<=0)throw new Error('A lista de legendas está inválida. Gere novamente.');
+ let end=0,total=0;return cues.map(item=>{
+  const start=item?.start,next=item?.end,text=typeof item?.text==='string'?item.text.trim():'';total+=Array.from(text).length;
+  if(typeof start!=='number'||typeof next!=='number'||!Number.isFinite(start)||!Number.isFinite(next)||start<end-.001||start<0||next<=start||next>duration+.01||!text||Array.from(text).length>180||total>200000)throw new Error('Confira o texto e os horários das legendas antes de baixar.');
+  if(Math.round(next*1000)<=Math.round(start*1000))throw new Error('Uma legenda ficou curta demais. Gere novamente para conferir os horários.');
+  end=next;return{start,end:next,text};
+ });
+}
+function normalizeGeneratedCaptionCues(cues,duration=Number(current?.duration)) {
+ if(!Array.isArray(cues)||cues.length>4000||!Number.isFinite(duration)||duration<=0)throw new Error('A lista de legendas está inválida. Gere novamente.');
+ let previous=0,total=0,clamped=0,removed=0;const normalized=[];
+ for(const item of cues){
+  const start=item?.start,end=item?.end,text=typeof item?.text==='string'?item.text.trim():'';total+=Array.from(text).length;
+  if(typeof start!=='number'||typeof end!=='number'||!Number.isFinite(start)||!Number.isFinite(end)||start<previous-.001||start<0||end<=start||!text||Array.from(text).length>180||total>200000)throw new Error('Confira o texto e os horários das legendas antes de baixar.');
+  previous=end;
+  if(start>=duration){removed++;continue;}
+  if(end>duration+.25)throw new Error('Os horários das legendas não correspondem à duração do vídeo. Prepare a prévia e gere novamente.');
+  const next=Math.min(end,duration);if(next<end)clamped++;
+  if(Math.round(next*1000)<=Math.round(start*1000))throw new Error('Uma legenda ficou curta demais ao ajustar o fim do vídeo. Gere novamente.');
+  normalized.push({start,end:next,text});
+ }
+ return{cues:validCaptionCues(normalized,duration),clamped,removed};
+}
+function captionExportReady() {
+ if(!captionsEnabled())return true;
+ if(captionState!=='ready'||captionBinding!==previewId)throw new Error('Gere e confira as legendas desta prévia antes de baixar.');
+ if(!captionCues.length)throw new Error('Nenhuma fala foi identificada. Gere novamente ou desative as legendas para baixar.');
+ validCaptionCues(captionCues);return true;
+}
+function captionBusy() {return ['queued','preparing','transcribing'].includes(captionState);}
+function renderCaptionState() {
+ const busy=captionBusy(),ready=!!previewId&&$('preview-player').readyState>=2&&!$('preview-player-wrap').hidden;
+ const allowed=$('format').value==='video'&&selectedItems().length===1&&Number(current?.duration)>0;
+ $('captions-enabled').disabled=!allowed;$('captions-controls').hidden=!$('captions-enabled').checked;
+ $('generate-captions').disabled=!allowed||!ready||busy||!token||keepClosed;
+ $('generate-captions').textContent=captionState==='ready'?'Gerar novamente':'Gerar legendas da prévia';$('cancel-captions').hidden=!busy;$('captions-progress').hidden=!busy;
+ if(captionState==='idle')$('captions-status').textContent=ready?'Clique em Gerar legendas para reconhecer a fala e conferir o resultado na prévia.':'Prepare uma prévia para gerar as legendas.';
+}
+function resetCaptionState(cancel=true) {
+ const previous=captionTask;captionTask='';captionGeneration++;clearTimeout(captionTimer);captionState='idle';captionCues=[];captionBinding='';$('captions-review').hidden=true;$('captions-list').replaceChildren();$('captions-status').classList.remove('invalid');
+ if(cancel&&previous&&token)api('subtitles/cancel',{id:previous}).catch(()=>{});
+ renderCaptionState();
+}
+function renderCaptionReview() {
+ $('captions-review').hidden=!captionCues.length;
+ const nodes=captionCues.map((cue,index)=>{
+  const item=document.createElement('li'),time=document.createElement('span'),input=document.createElement('textarea'),field=document.createElement('div'),hint=document.createElement('small');time.textContent=timeLabel(cue.start)+' → '+timeLabel(cue.end);input.value=cue.text;input.maxLength=180;input.rows=2;input.setAttribute('aria-label','Texto da legenda '+(index+1));
+  hint.textContent='Texto longo: encurte a frase para melhorar a leitura.';hint.className='caption-length-note';hint.hidden=Array.from(cue.text).length<=64;
+  input.addEventListener('input',()=>{captionCues[index].text=input.value;input.setAttribute('aria-invalid',String(!input.value.trim()));hint.hidden=Array.from(input.value).length<=64;drawVerticalPreview();updateSection();});field.append(input,hint);item.append(time,field);return item;
+ });$('captions-list').replaceChildren(...nodes);
+}
+function acceptCaptionTask(data,binding,generation) {
+ if(generation!==captionGeneration||binding!==previewId||keepClosed){if(data.id&&token)api('subtitles/cancel',{id:data.id}).catch(()=>{});return;}
+ if(data.preview_id&&data.preview_id!==binding)throw new Error('As legendas não correspondem a esta prévia. Gere novamente.');
+ if(data.id)captionTask=data.id;captionState=data.status||data.state||'preparing';
+ if(captionState==='transcribing'&&Number.isFinite(data.progress))$('captions-progress').value=Math.max(0,Math.min(100,data.progress));else $('captions-progress').removeAttribute('value');
+ $('captions-status').textContent=data.error||data.stage||data.message||'Reconhecendo a fala…';$('captions-status').classList.toggle('invalid',captionState==='failed'||!!data.error);
+ if(captionState==='ready'){
+  const normalized=normalizeGeneratedCaptionCues(data.cues||[]);captionCues=normalized.cues;captionBinding=binding;renderCaptionReview();
+  const note=captionCues.length?captionCues.length+' legendas geradas. Confira a prévia e revise o texto; prefira frases curtas para facilitar a leitura.':normalized.removed?'As legendas recebidas estavam fora da duração deste vídeo. Gere novamente.':'Nenhuma fala foi identificada nesta prévia.';
+  const warnings=[];if(normalized.clamped)warnings.push('O fim de '+normalized.clamped+' legenda(s) foi ajustado ao fim do vídeo.');if(normalized.removed)warnings.push(normalized.removed+' legenda(s) fora da duração foram ignoradas. Confira a prévia.');
+  $('captions-status').textContent=[note,...warnings].join(' ');updateSection();
+ }else if(captionBusy()){
+  captionTimer=setTimeout(async()=>{try{acceptCaptionTask(await api('subtitles?id='+encodeURIComponent(captionTask)),binding,generation);}catch(error){captionFailure(error,generation);}},1400);
+ }
+ renderCaptionState();drawVerticalPreview();
+}
+function captionFailure(error,generation) {if(generation!==captionGeneration)return;captionState='failed';$('captions-status').textContent=error.message;$('captions-status').classList.add('invalid');renderCaptionState();updateSection();}
+$('captions-enabled').addEventListener('change',updateSection);
+$('captions-language').addEventListener('change',()=>{resetCaptionState();updateSection();});
+$('generate-captions').addEventListener('click',async()=>{
+ if(!previewId||!token||captionBusy())return;
+ resetCaptionState();const generation=captionGeneration,binding=previewId;captionState='preparing';$('captions-status').textContent='Preparando o reconhecimento de fala…';renderCaptionState();updateSection();
+ try{const key=new URL($('preview-player').src,location.href).searchParams.get('key');acceptCaptionTask(await api('subtitles',{preview_id:binding,key,language:$('captions-language').value}),binding,generation);}catch(error){captionFailure(error,generation);}
+});
+$('cancel-captions').addEventListener('click',async()=>{
+ const id=captionTask;resetCaptionState(false);captionState='cancelled';$('captions-status').textContent='Geração cancelada. Você pode gerar novamente ou desativar as legendas.';renderCaptionState();updateSection();if(id&&token)try{await api('subtitles/cancel',{id});}catch(error){$('captions-status').textContent=error.message;}
+});
 async function api(path, body) {
   const response=await fetch('/api/'+path, {method:body?'POST':'GET',headers:{'X-Keep-Token':token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const data=await response.json();
@@ -329,7 +491,7 @@ function videoRequest(item = current) {
   return {url:inspection?.url || item?.url || $('video-url').value.trim(), browser:$('browser-session').value,
     ...(item?.video_index !== undefined ? {video_index:item.video_index} : {}),
     ...(item?.video_id ? {video_id:item.video_id} : {}),
-    ...(inspection?.inspection_id ? {inspection_id:inspection.inspection_id} : {})};
+    ...(inspection?.inspection_id ? {inspection_id:inspection.inspection_id} : {}),...(item?.clip?{clip:{...item.clip}}:{})};
 }
 function showCurrentVideo(item, section = null) {
   resetPreview();resetEditor();current=item;
@@ -365,6 +527,60 @@ $('select-all-videos').addEventListener('click',()=>{
   selectedVideos=new Set(all?[]:currentItems.map(item=>String(item.video_index)));
   resetPreview();resetEditor();configureSection(null);renderPostVideos();updateSection();
 });
+let liveCandidate=null,liveId='',liveState=null,liveTimer,liveBusy=false,liveClipping=false;
+function showLiveCandidate(data){
+ if(liveId&&['connecting','buffering'].includes(liveState?.status)){
+  message('O Keep já acompanha uma live. Pare o acompanhamento antes de escolher outra.',true);return false;
+ }
+ liveCandidate=data;$('live-panel').hidden=false;$('live-title').textContent='Ao vivo · '+data.title;
+ renderLive(liveState);return true;
+}
+function renderLive(data){
+ liveState=data;
+ const active=!!data&&['connecting','buffering'].includes(data.status);
+ $('live-start').hidden=active;$('live-start').disabled=liveBusy||liveClipping||!liveCandidate;
+ $('live-stop').hidden=!active;$('live-stop').disabled=liveBusy;
+ $('live-clip').disabled=liveClipping||liveBusy||!(data?.buffer_seconds>0);
+ $('live-clip').textContent=liveClipping?'Preparando clipe…':'Salvar clipe e abrir prévia';
+ $('live-status').textContent=data?(data.error||data.stage)+(data.buffer_seconds>0?` ${data.buffer_seconds} s recentes disponíveis.`:''):'Clique em Acompanhar live antes do momento que deseja guardar.';
+ $('live-status').classList.toggle('invalid',data?.status==='failed');
+}
+function pollLive(){
+ clearTimeout(liveTimer);const id=liveId;if(!id||keepClosed)return;
+ liveTimer=setTimeout(async()=>{
+  try{const data=await api('live?id='+encodeURIComponent(id));if(id!==liveId)return;renderLive(data);if(['connecting','buffering'].includes(data.status))pollLive();}
+  catch(error){if(id===liveId){$('live-status').textContent=error.message;$('live-status').classList.add('invalid');$('live-clip').disabled=true;$('live-stop').hidden=false;if(error.status===404){liveId='';renderLive(null);$('live-status').textContent=error.message;}else pollLive();}}
+ },1500);
+}
+$('live-start').addEventListener('click',async()=>{
+ if(!liveCandidate||liveBusy)return;
+ liveBusy=true;renderLive(liveState);$('live-status').textContent='Conferindo a transmissão e iniciando o acompanhamento…';
+ try{const data=await api('live/start',{url:liveCandidate.url,browser:$('browser-session').value});liveId=data.id;renderLive(data);pollLive();}
+ catch(error){$('live-status').textContent=error.message;$('live-status').classList.add('invalid');}
+ finally{liveBusy=false;$('live-start').disabled=false;$('live-stop').disabled=false;}
+});
+$('live-stop').addEventListener('click',async()=>{
+ if(!liveId||liveBusy)return;
+ liveBusy=true;clearTimeout(liveTimer);renderLive(liveState);
+ try{renderLive(await api('live/stop',{id:liveId}));}
+ catch(error){$('live-status').textContent=error.message;pollLive();}
+ finally{liveBusy=false;renderLive(liveState);}
+});
+$('live-clip').addEventListener('click',async()=>{
+ if(!liveId||liveClipping||liveBusy)return;
+ liveClipping=true;renderLive(liveState);const generation=previewGeneration;
+ try{
+  const data=await api('live/clip',{id:liveId,seconds:Number($('live-seconds').value)});
+  if(generation!==previewGeneration){if(data.preview?.id)api('preview/cancel',{id:data.preview.id}).catch(()=>{});toast('Clipe salvo em Meus downloads.');return;}
+  inspection=null;currentItems=[{...data.video,clip:{id:data.preview.id}}];selectedVideos=new Set(['1']);
+  showCurrentVideo(currentItems[0]);renderPostVideos();$('video-result').hidden=false;
+  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=true;$('cancel-preview').hidden=true;
+  message('Clipe original salvo em Meus downloads. Use a prévia abaixo para cortar, compor a câmera e gerar legendas; Baixar salva outra versão com suas edições.');
+  await refresh();refreshStorage(true);
+ }catch(error){$('live-status').textContent=error.message;$('live-status').classList.add('invalid');}
+ finally{liveClipping=false;$('live-clip').textContent='Salvar clipe e abrir prévia';$('live-clip').disabled=!(liveState?.buffer_seconds>0);}
+});
+
 async function inspectVideo(automatic = false) {
   if(searching || startingDownload || batchRunning)return;
   if(!local){message('Para baixar este vídeo, baixe o app para seu sistema acima e abra o Keep no seu computador.');return;}
@@ -375,7 +591,7 @@ async function inspectVideo(automatic = false) {
   try{
     const data=await api('inspect',{url:submitted,browser:submittedBrowser});
     if($('video-url').value.trim()!==submitted || $('browser-session').value!==submittedBrowser){message('O link ou a opção de cookies mudou. Busque o vídeo novamente.');return;}
-    if(data.live)throw new Error('Esta é uma transmissão ao vivo. Tente a gravação depois que ela terminar.');
+    if(data.live){if(showLiveCandidate(data))message('Live encontrada. Inicie o acompanhamento para salvar os próximos momentos.');return;}
     inspection=data;
     currentItems=(Array.isArray(data.items)&&data.items.length?data.items:[data]).map((item,index)=>({...data,...item,items:undefined,video_index:item.video_index??index+1}));
     selectedVideos=new Set(currentItems.length===1?[String(currentItems[0].video_index)]:[]);
@@ -389,7 +605,7 @@ async function inspectVideo(automatic = false) {
     if(!automatic&&requestedEditor&&selectedItems().length===1){
       $('format').value=requestedEditor.mode;editSections=requestedEditor.sections.map(item=>({...item}));$('download-scope').value='section';$('section-output').value='join';
       $('section-start').value=timeLabel(editSections[0].start);$('section-end').value=timeLabel(editSections[0].end);$('vertical-enabled').checked=requestedEditor.vertical===true;
-      $('crop-x').value=String((requestedEditor.crop?.x??.5)*100);$('crop-y').value=String((requestedEditor.crop?.y??.5)*100);renderSections();updateSection();
+      $('crop-x').value=String((requestedEditor.crop?.x??.5)*100);$('crop-y').value=String((requestedEditor.crop?.y??.5)*100);editorLayout=requestedEditor.layout==='stacked'?'stacked':'full';if(requestedEditor.camera)editorRegions.camera=normalizeRegion(requestedEditor.camera);if(requestedEditor.content)editorRegions.content=normalizeRegion(requestedEditor.content);$('camera-height').value=String((requestedEditor.camera_height??.3)*100);if(requestedEditor.captions?.enabled){pendingCaptionCues=validCaptionCues(requestedEditor.captions.cues);$('captions-enabled').checked=true;}syncRegionFields();renderSections();updateSection();
     }
     if(automatic) {
       $('format').value='video';$('download-scope').value='full';updateSection();
@@ -401,6 +617,7 @@ async function inspectVideo(automatic = false) {
 }
 function invalidateVideo(){resetPreview();resetEditor();current=null;inspection=null;currentItems=[];selectedVideos.clear();$('custom-name').value='';$('video-result').hidden=true;}
 function resetPreview() {
+  resetCaptionState();
   const previous=previewId;previewId='';previewGeneration++;clearTimeout(previewTimer);previewPlayingSection=false;
   previewFPS=null;previewDimensions=null;previewFrameTimes=null;previewFrameNote='';frameSeekBusy=false;cropDrag=null;$('crop-overlay').setAttribute('hidden','');
   clearVerticalPreview();
@@ -411,12 +628,14 @@ function resetPreview() {
   $('preview-status').classList.remove('invalid');
   ['mark-start','mark-end','play-section','frame-back','frame-forward'].forEach(id=>$(id).disabled=true);
   if(previous&&token)api('preview/cancel',{id:previous}).catch(()=>{});
+  renderCaptionState();
 }
 function showPreview(data,generation) {
   if(generation!==previewGeneration)return;
   if(data.id)previewId=data.id;
   if(data.status==='cancelled'||data.status==='failed'||data.status==='error'||data.error)throw new Error(data.error||(data.status==='cancelled'?'A prévia foi cancelada.':'Não foi possível preparar a prévia.'));
   if(data.status==='ready'&&data.media_url) {
+    if(current?.clip?.id===data.id)current.clip.key=new URL(data.media_url,location.href).searchParams.get('key');
     previewFPS=data.fps;previewDimensions={width:data.width,height:data.height};
     previewFrameTimes=data.frames_indexed===true?validatedFrameTimes(data.frame_times,Number(data.duration)):null;
     previewFrameNote=data.frames_indexed===true&&!previewFrameTimes?'A lista de quadros não pôde ser usada nesta página; os passos são estimados.':typeof data.frame_note==='string'?data.frame_note:'';
@@ -425,6 +644,7 @@ function showPreview(data,generation) {
     const player=$('preview-player');player.src=media.href;player.load();
     $('preview-player-wrap').hidden=false;$('prepare-preview').disabled=false;$('prepare-preview').innerHTML=icon('play')+'Preparar novamente';
     $('cancel-preview').textContent='Descartar prévia';
+    if(current?.clip){$('prepare-preview').disabled=true;$('prepare-preview').textContent='Clipe da live pronto';$('cancel-preview').hidden=true;}
     $('preview-status').textContent='Dê play e use Marcar início e Marcar fim na posição desejada. A prévia pode ter qualidade menor; o download usa a qualidade escolhida.';
     return;
   }
@@ -453,6 +673,7 @@ $('prepare-preview').addEventListener('click',async()=>{
 });
 $('cancel-preview').addEventListener('click',()=>{resetPreview();$('preview-status').textContent='Prévia descartada. Os horários escolhidos foram mantidos.';});
 $('preview-player').addEventListener('loadedmetadata',()=>{
+  if(pendingCaptionCues&&previewId){captionCues=pendingCaptionCues;pendingCaptionCues=null;captionBinding=previewId;captionState='ready';renderCaptionReview();$('captions-status').textContent='Legendas da edição anterior recuperadas. Confira o texto na nova prévia.';}
   ['mark-start','mark-end'].forEach(id=>$(id).disabled=false);updateSection();
   $('preview-clock').textContent=timeLabel($('preview-player').currentTime)+' / '+timeLabel($('preview-player').duration||current?.duration||0);
   updateVertical();updateFrameInfo();updateTimelineClock();
@@ -504,16 +725,25 @@ $('download-scope').addEventListener('change',updateSection);
 ['section-start','section-end'].forEach(id=>$(id).addEventListener('input',updateSection));
 $('download-button').addEventListener('click',()=>startDownloads());
 function buildDownloadRequests(automatic=false) {
+ if(current?.clip&&!current.clip.key)throw new Error('Aguarde a prévia do clipe ficar pronta.');
  const selected=selectedItems();if(!selected.length)throw new Error('Marque pelo menos um vídeo do post.');
  const browser=$('browser-session').value,mode=automatic?'video':$('format').value,quality=automatic?defaultQuality:$('quality').value;
- const sections=automatic?null:plannedSections(),customName=automatic?'':$('custom-name').value.trim();
+ let sections=automatic?null:plannedSections();const customName=automatic?'':$('custom-name').value.trim();
  if(mode==='gif'&&!sections)throw new Error('Escolha um trecho de até 30 segundos para criar um GIF.');
  const base=item=>({...videoRequest(item),browser,title:item.title,mode,quality,section:null,...(customName?{custom_name:customName}:{})});
+ const vertical=!automatic&&mode==='video'&&verticalEnabled(),captions=!automatic&&captionsEnabled();
+ if(captions)captionExportReady();
+ if(!sections&&(vertical||captions)){
+  if(selected.length!==1||!Number.isFinite(current?.duration)||current.duration<=0)throw new Error('Selecione um vídeo com duração informada para editar.');
+  if(current.duration>7200)throw new Error('Selecione trechos de até duas horas para editar ou legendar.');
+  sections=[{start:0,end:current.duration}];
+ }
  if(!sections)return selected.map(base);
  if(selected.length!==1)throw new Error('Para editar trechos, selecione apenas um vídeo.');
- const vertical=mode==='video'&&verticalEnabled(),crop={x:Number($('crop-x').value)/100,y:Number($('crop-y').value)/100};
- const groups=$('section-output').value==='join'?[sections]:sections.map(section=>[section]);
- return groups.map((group,index)=>({...base(selected[0]),...(customName&&groups.length>1?{custom_name:customName.slice(0,105)+'_trecho_'+String(index+1).padStart(2,'0')}:{ }),edit:{sections:group.map(item=>({...item})),vertical,crop}}));
+ const crop={x:Number($('crop-x').value)/100,y:Number($('crop-y').value)/100};
+ const groups=$('download-scope').value==='section'&&$('section-output').value!=='join'?sections.map(section=>[section]):[sections];
+ const composition=vertical&&editorLayout==='stacked'?{layout:'stacked',camera:{...editorRegions.camera},content:{...editorRegions.content},camera_height:Number($('camera-height').value)/100}:{layout:'full'};
+ return groups.map((group,index)=>({...base(selected[0]),...(customName&&groups.length>1?{custom_name:customName.slice(0,105)+'_trecho_'+String(index+1).padStart(2,'0')}:{ }),edit:{sections:group.map(item=>({...item})),vertical,crop,...composition,...(captions?{captions:{enabled:true,cues:validCaptionCues(captionCues)}}:{})}}));
 }
 async function startDownloads(automatic = false) {
  if(!current||startingDownload||batchRunning)return;
@@ -578,7 +808,7 @@ $('batch-start').addEventListener('click',async()=>{
       try{
         if(!validBatchURL(entry.url))throw new Error('Link inválido ou plataforma não compatível.');
         const data=await api('inspect',{url:entry.url,browser});
-        if(data.live)throw new Error('Transmissões ao vivo não são aceitas. Use um clipe ou VOD.');
+        if(data.live)throw new Error('Para criar clipes de uma live, abra o link individualmente e clique em Acompanhar live.');
         const items=Array.isArray(data.items)&&data.items.length?data.items:[data];
         if(items.length>1){
           inspection=data;currentItems=items.map((item,i)=>({...data,...item,items:undefined,video_index:item.video_index??i+1}));selectedVideos=new Set();
@@ -666,7 +896,7 @@ function renderJobs(){
  const active=jobs.filter(job=>job.status==='downloading').length,queued=jobs.filter(job=>job.status==='queued').length,paused=jobs.filter(job=>job.status==='paused').length;
  $('queue-summary').textContent=[active?`${active} em andamento`:null,queued?`${queued} na fila`:null,paused?`${paused} pausado${paused===1?'':'s'}`:null].filter(Boolean).join(' · ')||'Até dois downloads ao mesmo tempo. Os próximos começam automaticamente.';
 }
-async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.0.1')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
+async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.1.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
 async function refreshStorage(force=false) {
  if(!local||!token||keepClosed||(!force&&Date.now()-storageCheckedAt<12000))return;
  storageCheckedAt=Date.now();
@@ -771,7 +1001,6 @@ async function showReleaseNotes(automatic=false) {
 }
 $('show-release-notes').addEventListener('click',()=>showReleaseNotes());
 $('close-release-notes').addEventListener('click',()=>$('release-dialog').close());
-const hostedLaunchOrigin='https://keep-video-joao-1020.astutecrane3.chatgpt.site';
 let updateTransferBusy=false;
 function renderDesktop(data) {
  desktopStatus=data;
@@ -782,9 +1011,8 @@ function renderDesktop(data) {
  $('install-launcher').disabled=!connected||!supported||desktopWorking;
  $('protocol-enabled').disabled=!connected||!supported||desktopWorking;
  $('protocol-enabled').checked=data?.protocol_enabled===true;
- $('protocol-status').textContent=data?.protocol_enabled?'Abertura pelo site permitida neste computador. Para lembrar sua escolha neste navegador, use o link abaixo.':'Abertura pelo site desativada neste computador. Você pode continuar usando o inicializador.';
+ $('protocol-status').textContent=data?.protocol_enabled?'Abertura pelo site permitida. No site público, clique em Abrir Keep. O navegador pode pedir confirmação.':'Abertura pelo site desativada neste computador. Você pode continuar usando o inicializador.';
  $('configure-hosted-launch').hidden=!data?.protocol_enabled;
- $('disable-hosted-launch').hidden=data?.protocol_enabled!==false;
  $('launcher-help').textContent=(data?.platform||session?.platform)==='windows'
    ?'Procure Keep no Iniciar. Clique com o botão direito e escolha Fixar em Iniciar; Mais → Fixar na barra de tarefas pode estar disponível. Você também pode abrir Keep.exe na pasta do app.'
    :'Procure Keep no menu de aplicativos do Linux. Use Adicionar aos favoritos ou Fixar, conforme o seu ambiente. Se não aparecer de imediato, reabra o menu ou encerre e inicie sua sessão.';
@@ -804,7 +1032,7 @@ $('install-launcher').addEventListener('click',async()=>{
 $('protocol-enabled').addEventListener('change',async()=>{
  if(!local||!token||desktopWorking)return;
  const enabled=$('protocol-enabled').checked;desktopWorking=true;renderDesktop(desktopStatus);$('protocol-status').textContent=enabled?'Permitindo a abertura pelo site…':'Desativando a abertura pelo site…';
- try{renderDesktop(await api('desktop/protocol',{enabled}));toast(enabled?'Abertura pelo site permitida. Configure a opção neste navegador pelo link abaixo.':'Abertura pelo site desativada.');}
+ try{renderDesktop(await api('desktop/protocol',{enabled}));toast(enabled?'Abertura pelo site permitida. Use o botão Abrir Keep no site público.':'Abertura pelo site desativada.');}
  catch(error){$('protocol-enabled').checked=desktopStatus?.protocol_enabled===true;$('protocol-status').textContent=error.message;}
  finally{desktopWorking=false;const supported=desktopStatus?.supported===true&&local&&!!token&&!keepClosed;$('install-launcher').disabled=!supported;$('protocol-enabled').disabled=!supported;}
 });
@@ -848,25 +1076,12 @@ function requestHostedLaunch() {
  try{location.assign('keep://launch');}
  catch{$('hosted-launch-status').textContent='O navegador não abriu o aplicativo. Clique novamente em Abrir Keep neste computador ou use o inicializador do app.';}
 }
-function initHostedLaunch(action) {
+function initHostedLaunch() {
  if(local)return;
  $('hosted-launch-panel').hidden=false;
- const official=location.origin===hostedLaunchOrigin;
- let enabled=false;try{enabled=localStorage.getItem('keep-auto-open')==='1';}catch{}
- if(action==='desativar-abertura'){try{localStorage.removeItem('keep-auto-open');}catch{}enabled=false;$('hosted-launch-status').textContent='A tentativa automática foi esquecida neste navegador. Você ainda pode usar Abrir Keep neste computador.';}
- else if(action==='ativar-abertura')$('hosted-launch-status').textContent='O computador já deve estar com a integração ativada. Marque a opção de lembrar se quiser tentar abrir o app nas próximas visitas a esta página.';
- $('hosted-auto-launch').checked=enabled;$('hosted-auto-launch').disabled=!official;
- if(!official){$('hosted-launch-status').textContent='Use a página privada oficial do Keep para lembrar a abertura automática. O botão Abrir Keep continua disponível.';return;}
- if(enabled&&!['ativar-abertura','desativar-abertura'].includes(action)&&!hostedLaunchAttempted){hostedLaunchAttempted=true;requestHostedLaunch();}
+ $('hosted-launch-status').textContent='Clique em Abrir Keep neste computador e confirme no navegador. O app precisa estar instalado e com a abertura pelo site habilitada.';
 }
 $('hosted-open-keep').addEventListener('click',event=>{event.preventDefault();requestHostedLaunch();});
-$('hosted-auto-launch').addEventListener('change',()=>{
- if(local||location.origin!==hostedLaunchOrigin)return;
- const enabled=$('hosted-auto-launch').checked;
- try{if(enabled)localStorage.setItem('keep-auto-open','1');else localStorage.removeItem('keep-auto-open');}
- catch{$('hosted-auto-launch').checked=false;$('hosted-launch-status').textContent='Este navegador não permitiu salvar a escolha. Use o botão Abrir Keep.';return;}
- $('hosted-launch-status').textContent=enabled?'Preferência salva neste navegador. Nas próximas visitas, será feita uma tentativa de abrir o Keep; o navegador pode pedir confirmação ou exigir que você clique no botão.':'Tentativa automática desativada neste navegador.';
-});
 function renderUpdate(data) {
   updateStatus=data;
   const state=data.state||'idle',busy=['checking','downloading','applying'].includes(state)||updateTransferBusy;
@@ -879,7 +1094,7 @@ function renderUpdate(data) {
   $('download-update').hidden=!data.can_download||rollback;
   $('download-update').disabled=busy||!local||!token;
   $('download-update').textContent=state==='failed'?'Tentar baixar novamente':'Baixar atualização';
-  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.0.1')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
+  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.1.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
   const labels={idle:'Verifique se há uma nova versão disponível.',checking:'Verificando a versão na página de atualizações…',available:'Uma nova versão está disponível.',current:'Você está usando a versão mais recente.',downloading:'Recebendo e verificando a atualização…',ready:'Atualização verificada. Clique em Atualizar e reiniciar para instalar.',applying:'Atualizando e reiniciando o Keep. Aguarde nesta página…',failed:'Não foi possível verificar a atualização.'};
   $('update-status').textContent=data.error||(rollback&&state==='applying'?'Restaurando a versão anterior e reiniciando o Keep. Aguarde nesta página…':data.message)||(rollback&&state==='ready'?'Cópia anterior conferida. Clique em Restaurar e reiniciar para concluir.':labels[state]||labels.idle);
   $('update-status').classList.toggle('invalid',state==='failed'||!!data.error);
@@ -957,7 +1172,7 @@ $('apply-update').addEventListener('click',async()=>{
 });
 $('quit-keep').addEventListener('click',async()=>{
   if(!local||!token||keepClosed)return;
-  if(!confirm('Encerrar o Keep? Downloads ativos serão pausados para continuar depois.'))return;
+  if(!confirm('Encerrar o Keep? Downloads ativos serão pausados. O acompanhamento de lives será encerrado e os segundos ainda não salvos serão descartados.'))return;
   $('quit-keep').disabled=true;
   try {
     await api('quit',{});keepClosed=true;token='';

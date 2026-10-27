@@ -27,11 +27,19 @@ python3 -m unittest discover -s app/tests -v
 
 Os testes de navegador precisam do pacote Python `playwright`, Chromium e FFmpeg; os testes de comparação do recorte precisam de Node e FFmpeg. Essas suítes indicam explicitamente quando os pré-requisitos estão ausentes. Não são dependências para executar o servidor.
 
+## Composição e legendas
+
+A versão 2.1.0 preserva o modo Cheia e adiciona Empilhado: duas áreas normalizadas do mesmo vídeo, para câmera e conteúdo, com altura da câmera entre 15% e 60% da saída 9:16. A prévia e o FFmpeg usam a mesma geometria de pixels pares. Os efeitos podem ser aplicados ao vídeo inteiro ou aos trechos.
+
+As legendas usam Vosk CPU local por `ctypes`, inclusive com o Python portátil Windows; não exigem pip nem chave de API. A primeira geração baixa binários nativos oficiais e um modelo verificado do idioma para `tools/subtitles`. Português usa o modelo oficial hospedado em `alphacephei.com`; Inglês usa um snapshot oficial do projeto Vosk. O áudio e a transcrição permanecem no computador. A interface permite cancelar, revisar o texto e conferir os mesmos tempos na prévia e no vídeo exportado.
+
+A geração exige uma prévia pronta, sua capacidade de acesso e o token da sessão local. A exportação valida os textos e horários e usa arquivos auxiliares para manter os comandos limitados, mesmo com muitas legendas. Esses arquivos temporários são removidos após a edição. Os modelos e ferramentas ficam fora dos pacotes pequenos de atualização; a primeira utilização precisa de rede.
+
 ## Atualizações públicas
 
 O aplicativo consulta o manifesto público `updates.json` deste repositório, compara a versão disponível com a instalada e mostra o aviso no app. A verificação não instala uma atualização: o usuário escolhe baixar o pacote e depois aplicar e reiniciar. A importação manual de ZIP/TAR.GZ e a restauração de uma cópia anterior continuam disponíveis.
 
-O Keep 2.0.0 ainda usa a consulta privada original. Para migrar uma instalação existente, importe uma vez o pacote de atualização 2.0.1 nas Preferências. A partir dessa versão, a consulta usa o canal público. Apenas publicar um novo manifesto no site não modifica o aplicativo já instalado.
+O Keep 2.0.0 ainda usa a consulta privada original. Para migrar uma instalação existente, importe uma vez o pacote de atualização atual nas Preferências. A partir dessa versão, a consulta usa o canal público. Apenas publicar um novo manifesto no site não modifica o aplicativo já instalado.
 
 Para preparar os dois pacotes de atualização, execute na raiz:
 
@@ -59,3 +67,9 @@ mantenha `main` na versão publicada até essa execução terminar; depois use
 o `updates.json` anexado à release e publique o site/manifesto em `main`.
 O push final deve usar a autenticação normal do publicador para disparar a
 publicação do GitHub Pages, pois pushes com GITHUB_TOKEN não a disparam.
+
+Lives em andamento do YouTube e da Twitch têm um buffer local de até dois
+minutos. Acompanhe antes do momento desejado e salve 15, 30, 60 ou 120 segundos;
+o original vai para downloads e a prévia permite editar e legendar o clipe.
+A captura usa yt-dlp e FFmpeg em até 720p, sem enviar o vídeo a outro serviço.
+A abertura pelo site aponta para https://joaoppolli.github.io/keep/ sem login.

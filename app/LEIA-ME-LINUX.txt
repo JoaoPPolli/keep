@@ -1,7 +1,7 @@
-KEEP 2.0.1 — GUIA EM PORTUGUÊS BRASILEIRO
+KEEP 2.1.0 — GUIA EM PORTUGUÊS BRASILEIRO
 LINUX — X64 OU ARM64
 
-Esta versão traz atualizações públicas, aviso de nova versão e prévia 9:16.
+Esta versão traz câmera empilhada e legendas locais com prévia, além do modo Cheia.
 
 COMEÇAR
 
@@ -69,14 +69,57 @@ quando unidos, podem exigir bastante tempo e espaço temporário; escolha
 arquivos separados para baixar apenas cada intervalo.
 
 GIF: até 30 segundos no total, 12 quadros por segundo e largura de até 640px.
-Vídeo vertical: selecione MP4 e ative o enquadramento 9:16. Prepare a prévia
-e arraste a área verde ou use os controles de posição. Vídeos já em 9:16 são
-identificados pelas dimensões e dispensam a conversão; o tipo do link não
-determina isso. A conversão recorta a imagem fora da área escolhida.
+VÍDEO VERTICAL E CÂMERA
+
+Selecione MP4 e ative o enquadramento 9:16. Cheia mantém o recorte de uma só
+área: prepare a prévia e arraste a borda verde ou ajuste a posição.
+No modo Cheia, vídeos já em 9:16 dispensam o recorte da imagem.
+
+Em Empilhado, escolha a área da câmera e a área do conteúdo no vídeo original.
+Arraste ou redimensione as seleções, ou use os controles de posição e tamanho.
+A câmera aparece acima do conteúdo na saída vertical. Ajuste sua participação
+na altura entre 15% e 60%, pelo divisor da prévia ou pelo controle.
+A seleção da câmera é manual; o Keep não detecta automaticamente onde ela está.
+Trocar entre os modos preserva os ajustes de cada um.
+
+LEGENDAS AUTOMÁTICAS
+
+Prepare a prévia, ative as legendas, escolha Português ou Inglês e clique em
+Gerar legendas. No primeiro uso, mantenha a internet disponível: o Keep baixa
+o reconhecedor Vosk e o modelo do idioma, conferindo sua integridade. Os
+componentes são guardados na pasta tools/subtitles e reutilizados depois.
+Não é necessário cadastrar uma chave nem enviar o áudio para um serviço.
+
+Acompanhe o progresso e cancele se necessário. Revise os textos na lista:
+ruído, música e falas sobrepostas podem prejudicar o reconhecimento.
+As legendas aparecem no resultado da prévia, no mesmo instante do original,
+e são gravadas no vídeo MP4 exportado. Desative a opção para exportar sem elas.
+Os efeitos podem ser aplicados ao vídeo inteiro ou aos trechos escolhidos.
+Para legendar, use vídeos gravados de até duas horas.
 
 O arquivo só é marcado como concluído após a conferência da edição. Um nome
 que já exista na pasta é preservado. A limpeza de falhas do editor remove
 somente os intermediários gerados pelo próprio download.
+
+CLIPES DE LIVES EM ANDAMENTO
+
+Cole o link da transmissão do YouTube ou do canal da Twitch, busque e clique
+em Acompanhar live. O Keep guarda até dois minutos recentes recebidos, em
+até 720p, com áudio. Escolha 15, 30, 60 ou 120 segundos e clique em Salvar
+clipe e abrir prévia. Se houver menos tempo disponível, salva o que recebeu.
+
+O original fica em Meus downloads. Na prévia, ajuste os cortes, escolha Cheia
+ou Empilhado e gere/revise as legendas; Baixar salva outra versão editada.
+As legendas são geradas no clipe salvo, não na transmissão em tempo real.
+
+O Keep precisa estar acompanhando antes do momento desejado: não recupera
+instantes anteriores. Há o atraso normal de entrega da plataforma e dos
+segmentos. Parar acompanhamento mantém o buffer recente até iniciar outra
+live ou fechar o Keep. Fechar descarta o buffer; os clipes salvos permanecem.
+O acompanhamento é limitado a uma live por vez, quatro horas por sessão e
+armazenamento temporário limitado. Inicie novamente para continuar.
+Conteúdo privado, restrito ou indisponível continua dependendo do acesso
+permitido pela própria plataforma. O site do Keep não exige login.
 
 ABERTURA PELO SITE E NOTIFICAÇÕES
 
@@ -84,13 +127,10 @@ Em Preferências, habilite Permitir abrir pelo site. Isso registra somente
 para o seu usuário a integração keep://launch, que pode apenas abrir o Keep;
 ela não aceita comandos, caminhos ou links de download.
 
-Abra a configuração do navegador pelo link indicado na mesma seção. Na
-página privada, escolha se deseja lembrar a abertura automática nesse
-navegador. Essa escolha é separada porque cada navegador e cada endereço têm
-seu próprio armazenamento. Só há uma tentativa por visita. O navegador pode
-pedir confirmação ou exigir um clique em Abrir Keep. Não há abertura
-silenciosa garantida nem tentativa de contornar as proteções do navegador.
-Para desativar, use a opção local e o link para esquecer a escolha no site.
+No site público https://joaoppolli.github.io/keep/ clique em Abrir Keep
+neste computador e confirme no navegador. Não é necessário login no site.
+Para desativar, desligue a opção nas Preferências do app. A antiga
+configuração de abertura automática pelo site privado foi removida.
 
 Notificações de conclusão são opcionais e ficam desativadas inicialmente.
 Ative em Preferências. O aviso depende das permissões e do modo de foco do
@@ -105,7 +145,7 @@ Verificar atualização refaz a consulta. Clique em Baixar atualização para
 receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
 A consulta não baixa nem instala o pacote automaticamente.
 
-Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.0.1 do seu sistema
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.1.0 do seu sistema
 nas Preferências. Versões anteriores sem importação podem usar o atualizador
 manual com o Keep fechado. O pacote deve vir da release pública oficial em
 https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências
@@ -142,7 +182,8 @@ Instagram e transmissões ao vivo não fazem parte desta versão.
 
 VALIDAÇÃO
 
-Windows: testes de funcionalidades, mídia real gerada para teste, atalhos,
-atualização e restauração executados em instalações isoladas.
-Linux: estrutura dos pacotes, permissões, gramática Python e rotinas verificadas
-com testes simulados no Windows. Não houve validação nativa em uma sessão Linux.
+Testes no ambiente Linux verificam a interface no navegador, composição e
+legendas em exportações reais com FFmpeg, áudio preservado, integridade dos
+pacotes e atualização manual em instalações isoladas. Reconhecimento de fala
+é validado com modelos locais. Não houve execução nativa Windows nesta etapa.
+Integrações de menu e notificações dependem da sessão gráfica do computador.
