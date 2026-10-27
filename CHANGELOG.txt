@@ -1,15 +1,20 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.1.0
+Versão atual: 2.1.1
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.1.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.1.1
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.1.1 — Changelog apenas da versão atual
+
+- A janela Novidades do app mostra somente o que veio na versão instalada,
+  sem acumular as notas de atualizações anteriores.
 
 2.1.0 — Câmera, legendas e clipes de live
 

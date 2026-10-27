@@ -1,4 +1,4 @@
-"""Portable preference backups and user-facing cumulative release notes."""
+"""Portable preference backups and release notes for the installed version."""
 import json
 
 PREFERENCE_DEFAULTS = {'paste_and_download': False, 'default_browser': 'none',
@@ -45,6 +45,9 @@ NOTES = {
         'Legendas automáticas locais em português e inglês, com revisão do texto antes de exportar.',
         'Confira câmera, conteúdo e legendas na prévia sincronizada, no vídeo inteiro ou nos trechos.',
     ],
+    '2.1.1': [
+        'O changelog do app agora mostra apenas as novidades da versão instalada, sem acumular atualizações anteriores.',
+    ],
 }
 
 
@@ -74,11 +77,7 @@ def import_preferences(backup):
 
 
 def release_notes(version):
-    notes = []
-    for released, items in NOTES.items():
-        notes.extend(items)
-        if released == version:
-            break
+    notes = list(NOTES.get(version, ()))
     return {'version': version, 'notes': notes, 'show': True}
 
 

@@ -109,21 +109,19 @@ jobs:
           set -euo pipefail
           mapfile -d '' assets < <(find artifacts -maxdepth 1 -type f -print0)
           test "${#assets[@]}" -gt 0
-          cat > "$RUNNER_TEMP/keep-release-notes.txt" <<'NOTES'
-          O Keep 2.1.0 adiciona clipes de lives em andamento do YouTube e da Twitch, câmera empilhada e legendas automáticas locais em português e inglês, com prévia e revisão do texto.
-
-          Lives: clique em Acompanhar live antes do momento desejado. O Keep mantém até dois minutos recentes recebidos em até 720p com áudio. Salve 15, 30, 60 ou 120 segundos; o original fica em Meus downloads e abre no editor para cortar, compor a câmera e legendar. Não recupera momentos anteriores ao acompanhamento.
-
-          Editor: mantenha Cheia ou use Empilhado com áreas independentes da câmera e do conteúdo. Mova, redimensione e ajuste a divisão da composição. Gere legendas da prévia e revise o texto antes de exportar. O primeiro uso baixa componentes Vosk do idioma; o áudio não é enviado para outro serviço.
-
-          A abertura pelo site agora usa https://joaoppolli.github.io/keep/ sem login. A configuração antiga de abertura automática pelo site privado foi removida. A verificação pública de atualizações e o aviso visual continuam disponíveis.
-
-          Primeira instalação: escolha o pacote portátil Windows ou o pacote Linux completo. No Linux, instale Python 3.10+ e FFmpeg e execute Iniciar Keep.sh. Os componentes incluídos no Windows são os mesmos da distribuição 2.0.0, com o código do app atualizado.
-
-          Já usa o Keep 2.0.0? Importe uma vez o pacote pequeno de atualização do seu sistema nas Preferências. Versões antigas sem importação podem usar o atualizador manual com o Keep fechado. Downloads, histórico e preferências são preservados.
-
-          Validação: testes do atualizador, navegador, câmera, exportação com áudio e legendas e captura de live local. Reconhecimento real de voz em português e inglês validado no ambiente de desenvolvimento. O ambiente não permite acessar transmissões públicas da Twitch; a captura também foi verificada com yt-dlp e uma transmissão HLS local. Não houve execução nativa Windows. SHA256SUMS.txt permite conferir a integridade dos pacotes e guias.
-          NOTES
+          python3 - <<'PYNOTES'
+          import os
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'app')
+          from maintenance import release_notes
+          version = os.environ['KEEP_TAG'].removeprefix('v')
+          notes = release_notes(version)['notes']
+          if not notes:
+              raise SystemExit('Add release notes for this exact version before publishing.')
+          Path(os.environ['RUNNER_TEMP'], 'keep-release-notes.txt').write_text(
+              'Keep ' + version + '\n\n' + '\n'.join('- ' + note for note in notes) + '\n', encoding='utf-8')
+          PYNOTES
           if gh release view "$KEEP_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/keep-release-draft"; then
             if [[ "$(cat "$RUNNER_TEMP/keep-release-draft")" == true ]]; then
               gh release upload "$KEEP_TAG" "${assets[@]}" --clobber

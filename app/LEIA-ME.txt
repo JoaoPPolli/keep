@@ -1,4 +1,4 @@
-KEEP 2.1.0 — GUIA EM PORTUGUÊS BRASILEIRO
+KEEP 2.1.1 — GUIA EM PORTUGUÊS BRASILEIRO
 WINDOWS 10/11 DE 64 BITS (INTEL/AMD)
 
 Esta versão traz câmera empilhada e legendas locais com prévia, além do modo Cheia.
@@ -137,7 +137,7 @@ Verificar atualização refaz a consulta. Clique em Baixar atualização para
 receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
 A consulta não baixa nem instala o pacote automaticamente.
 
-Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.1.0 do seu sistema
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.1.1 do seu sistema
 nas Preferências. Versões anteriores sem importação podem usar o atualizador
 manual com o Keep fechado. O pacote deve vir da release pública oficial em
 https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências
