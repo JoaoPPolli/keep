@@ -937,7 +937,7 @@ function renderJobs(){
  const active=jobs.filter(job=>job.status==='downloading').length,queued=jobs.filter(job=>job.status==='queued').length,paused=jobs.filter(job=>job.status==='paused').length;
  $('queue-summary').textContent=[active?`${active} em andamento`:null,queued?`${queued} na fila`:null,paused?`${paused} pausado${paused===1?'':'s'}`:null].filter(Boolean).join(' · ')||'Até dois downloads ao mesmo tempo. Os próximos começam automaticamente.';
 }
-async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.2.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
+async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.2.1')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
 async function refreshStorage(force=false) {
  if(!local||!token||keepClosed||(!force&&Date.now()-storageCheckedAt<12000))return;
  storageCheckedAt=Date.now();
@@ -1135,7 +1135,7 @@ function renderUpdate(data) {
   $('download-update').hidden=!data.can_download||rollback;
   $('download-update').disabled=busy||!local||!token;
   $('download-update').textContent=state==='failed'?'Tentar baixar novamente':'Baixar atualização';
-  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.2.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
+  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.2.1')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
   const labels={idle:'Verifique se há uma nova versão disponível.',checking:'Verificando a versão na página de atualizações…',available:'Uma nova versão está disponível.',current:'Você está usando a versão mais recente.',downloading:'Recebendo e verificando a atualização…',ready:'Atualização verificada. Clique em Atualizar e reiniciar para instalar.',applying:'Atualizando e reiniciando o Keep. Aguarde nesta página…',failed:'Não foi possível verificar a atualização.'};
   $('update-status').textContent=data.error||(rollback&&state==='applying'?'Restaurando a versão anterior e reiniciando o Keep. Aguarde nesta página…':data.message)||(rollback&&state==='ready'?'Cópia anterior conferida. Clique em Restaurar e reiniciar para concluir.':labels[state]||labels.idle);
   $('update-status').classList.toggle('invalid',state==='failed'||!!data.error);
@@ -1170,9 +1170,10 @@ async function refreshUpdate() {
 function updateError(text) {
   updateTransferBusy=false;renderUpdate({...updateStatus,state:'failed',error:text,can_apply:false});
 }
+let lastUpdateCheckAt=0;
 async function checkForUpdates(automatic=false) {
   if(!local||!token||keepClosed||updateTransferBusy||['checking','downloading','applying','ready'].includes(updateStatus?.state))return;
-  updateTransferBusy=true;
+  lastUpdateCheckAt=Date.now();updateTransferBusy=true;
   renderUpdate({...updateStatus,state:'checking',error:'',message:'Consultando a versão pública mais recente…'});
   try {
     const data=await api('update/check',{});
@@ -1181,6 +1182,10 @@ async function checkForUpdates(automatic=false) {
     updateError(automatic?'Não foi possível verificar atualizações ao abrir. Tente novamente nas Preferências.':error.message);
   }
 }
+setInterval(()=>{if(document.visibilityState==='visible')checkForUpdates(true);},5*60*1000);
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='visible'&&Date.now()-lastUpdateCheckAt>=60000)checkForUpdates(true);
+});
 $('check-update').addEventListener('click',()=>checkForUpdates());
 $('update-banner-action').addEventListener('click',()=>{
   view('settings');$('check-update').scrollIntoView({block:'center',behavior:'smooth'});$('check-update').focus({preventScroll:true});

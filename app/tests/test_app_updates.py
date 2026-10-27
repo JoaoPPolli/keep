@@ -310,5 +310,25 @@ class BoundedFetchTest(unittest.TestCase):
             self.assertEqual(opener.return_value.open.call_args.kwargs['timeout'], updates.NETWORK_TIMEOUT)
 
 
+
+class FreshManifestTests(unittest.TestCase):
+    def test_each_public_manifest_request_has_a_fresh_cache_key(self):
+        requests=[]
+        class Response:
+            headers={}
+            def __init__(self,url):self.url=url;self.data=b'{}'
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def geturl(self):return self.url
+            def read1(self,count):data,self.data=self.data,b'';return data
+        class Opener:
+            def open(self,request,timeout):requests.append(request.full_url);return Response(request.full_url)
+        with patch.object(updates,'build_opener',return_value=Opener()):
+            for attempt in range(2):self.assertEqual(updates._fetch_public(updates.PUBLIC_MANIFEST_URL,1024,'manifest'),b'{}')
+        self.assertNotEqual(requests[0],requests[1])
+        self.assertTrue(all(url.startswith(updates.PUBLIC_MANIFEST_URL+'?keep_check=') for url in requests))
+        for url in (updates.PUBLIC_MANIFEST_URL+'?other=1',updates.PUBLIC_MANIFEST_URL+'?keep_check=evil',updates.PUBLIC_MANIFEST_URL.replace('raw.githubusercontent.com','evil.example')):
+            with self.assertRaises(ValueError):updates._validate_public_url(url,'manifest')
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-KEEP 2.2.0
+KEEP 2.2.1
 Seus vídeos, sempre por perto.
 
 Baixe vídeos do YouTube, X e Twitch, escolha trechos e organize os arquivos
@@ -9,7 +9,7 @@ Site do Keep
 https://joaoppolli.github.io/keep/
 
 Versão atual, downloads e notas da entrega
-https://github.com/JoaoPPolli/keep/releases/tag/v2.2.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.2.1
 
 
 BAIXAR O KEEP
@@ -18,23 +18,23 @@ WINDOWS — PRIMEIRA INSTALAÇÃO
 Pacote portátil completo para Windows 10/11 de 64 bits, Intel/AMD.
 Inclui Python, FFmpeg, Node e o mecanismo de download.
 
-Keep-2.2.0-Windows-Portatil.zip
-https://github.com/JoaoPPolli/keep/releases/download/v2.2.0/Keep-2.2.0-Windows-Portatil.zip
+Keep-2.2.1-Windows-Portatil.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.2.1/Keep-2.2.1-Windows-Portatil.zip
 
 LINUX — PRIMEIRA INSTALAÇÃO
 Pacote para Linux x64 ou ARM64. Requer Python 3.10 ou posterior e FFmpeg.
 A primeira preparação dos demais componentes precisa de internet.
 
-Keep-2.2.0-Linux.tar.gz
-https://github.com/JoaoPPolli/keep/releases/download/v2.2.0/Keep-2.2.0-Linux.tar.gz
+Keep-2.2.1-Linux.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.2.1/Keep-2.2.1-Linux.tar.gz
 
 JÁ TEM O KEEP? BAIXE SOMENTE A ATUALIZAÇÃO DO SEU SISTEMA
 
-Windows — Keep-2.2.0-Windows-Atualizacao.zip
-https://github.com/JoaoPPolli/keep/releases/download/v2.2.0/Keep-2.2.0-Windows-Atualizacao.zip
+Windows — Keep-2.2.1-Windows-Atualizacao.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.2.1/Keep-2.2.1-Windows-Atualizacao.zip
 
-Linux — Keep-2.2.0-Linux-Atualizacao.tar.gz
-https://github.com/JoaoPPolli/keep/releases/download/v2.2.0/Keep-2.2.0-Linux-Atualizacao.tar.gz
+Linux — Keep-2.2.1-Linux-Atualizacao.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.2.1/Keep-2.2.1-Linux-Atualizacao.tar.gz
 
 A Release também oferece a instalação leve para Windows. Ela prepara os
 componentes na primeira abertura e exige internet; para começar com todos
@@ -77,7 +77,7 @@ A partir do Keep 2.0.1, Verificar atualização consulta o canal público,
 sem login. O app verifica ao abrir e mostra um aviso quando há uma versão
 nova. Você escolhe baixar o pacote e depois atualizar e reiniciar.
 
-Quem usa o Keep 2.0.0 precisa importar o pacote 2.2.0 uma vez nas
+Quem usa o Keep 2.0.0 precisa importar o pacote 2.2.1 uma vez nas
 Preferências. Depois disso, as verificações usam o canal público.
 
 
@@ -111,20 +111,20 @@ ao vivo não estão incluídos.
 
 CHANGELOG E GUIAS
 
-Histórico completo das 19 versões, da 1.0 à 2.2.0
+Histórico completo das 20 versões, da 1.0 à 2.2.1
 https://joaoppolli.github.io/keep/changelog.html
 
 Changelog em TXT no próprio GitHub
 https://github.com/JoaoPPolli/keep/blob/main/CHANGELOG.txt
 
 Guia Windows em TXT
-https://github.com/JoaoPPolli/keep/releases/download/v2.2.0/Keep-2.2.0-LEIA-ME-Windows.txt
+https://github.com/JoaoPPolli/keep/releases/download/v2.2.1/Keep-2.2.1-LEIA-ME-Windows.txt
 
 Guia Linux em TXT
-https://github.com/JoaoPPolli/keep/releases/download/v2.2.0/Keep-2.2.0-LEIA-ME-Linux.txt
+https://github.com/JoaoPPolli/keep/releases/download/v2.2.1/Keep-2.2.1-LEIA-ME-Linux.txt
 
 
-SOBRE A VERSÃO 2.2.0
+SOBRE A VERSÃO 2.2.1
 
 - Cheia mantém o recorte vertical em uma só área.
 - Empilhado permite mover e redimensionar a seleção da câmera e a do
@@ -159,12 +159,12 @@ As licenças dos componentes distribuídos estão na pasta licenses/.
 DESENVOLVIMENTO DO APLICATIVO
 
 Os fontes do app estão em app/, recuperados dos pacotes públicos 2.0.0
-com SHA-256 conferido. A versão 2.2.0 mantém câmera empilhada e legendas locais, com prévia completa,
+com SHA-256 conferido. A versão 2.2.1 mantém câmera empilhada e legendas locais, com prévia completa,
 além das atualizações públicas e do modo de enquadramento Cheia.
 Consulte app/README.md para executar, testar e gerar os pacotes.
 
 O manifesto updates.json anuncia somente pacotes já publicados. Para
-migrar do 2.0.0, importe o pacote 2.2.0 uma vez nas Preferências;
+migrar do 2.0.0, importe o pacote 2.2.1 uma vez nas Preferências;
 o app instalado não muda apenas com a publicação do site.
 
 CLIPES DE LIVES

@@ -142,6 +142,27 @@ class BrowserTests(unittest.TestCase):
         # Release notes may open automatically; they are unrelated to these controls.
         self.page.evaluate("if ($('release-dialog').open) $('release-dialog').close()")
 
+    def test_update_published_after_open_is_found_without_manual_click(self):
+        self.check_result={'state':'current','current_version':self.version,'latest_version':self.version,'update_available':False}
+        self.page.clock.install()
+        self.open_app()
+        self.assertEqual(self.check_calls,1)
+        self.assertFalse(self.page.locator('#update-banner').is_visible())
+        self.check_result={'state':'available','current_version':self.version,'latest_version':'9.9.9','update_available':True,'can_download':True}
+        self.page.clock.fast_forward(300001)
+        self.page.wait_for_function("()=>updateStatus?.latest_version==='9.9.9'")
+        self.assertGreaterEqual(self.check_calls,2)
+        self.assertTrue(self.page.locator('#update-banner').is_visible())
+        self.assertEqual(self.download_calls,0)
+
+    def test_returning_to_the_tab_checks_again_after_a_minute(self):
+        self.open_app()
+        initial=self.check_calls
+        self.page.evaluate("lastUpdateCheckAt=Date.now()-61000;document.dispatchEvent(new Event('visibilitychange'))")
+        self.page.wait_for_function("()=>!updateTransferBusy")
+        self.assertEqual(self.check_calls,initial+1)
+        self.assertEqual(self.download_calls,0)
+
     def test_update_checks_automatically_and_notice_opens_settings(self):
         self.open_app()
         self.assertEqual(self.check_calls, 1)

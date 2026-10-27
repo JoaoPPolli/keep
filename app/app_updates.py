@@ -42,7 +42,8 @@ def _validate_public_url(url, kind, version=None, platform=None, redirect=False)
             or parsed.port not in (None, 443) or parsed.fragment):
         raise ValueError('A atualização exige um endereço HTTPS oficial do Keep.')
     if kind == 'manifest':
-        valid = url == PUBLIC_MANIFEST_URL
+        valid = (parsed._replace(query='').geturl() == PUBLIC_MANIFEST_URL
+                 and (not parsed.query or re.fullmatch(r'keep_check=[0-9a-f]{16}', parsed.query)))
     elif kind == 'release':
         valid = (parsed.hostname == 'github.com' and not parsed.query
                  and parsed.path == '/JoaoPPolli/keep/releases/tag/v' + version)
@@ -73,7 +74,8 @@ def _fetch_public(url, limit, kind, version=None, platform=None):
             _validate_public_url(newurl, kind, version, platform, redirect=True)
             return super().redirect_request(req, fp, code, msg, headers, newurl)
 
-    request = Request(url, headers={'User-Agent': 'Keep-update-check', 'Accept': 'application/json' if kind == 'manifest' else 'application/octet-stream', 'Cache-Control': 'no-cache'})
+    request_url = url + '?keep_check=' + secrets.token_hex(8) if kind == 'manifest' else url
+    request = Request(request_url, headers={'User-Agent': 'Keep-update-check', 'Accept': 'application/json' if kind == 'manifest' else 'application/octet-stream', 'Cache-Control': 'no-cache'})
     started = time.monotonic()
     with build_opener(OfficialRedirects()).open(request, timeout=NETWORK_TIMEOUT) as response:
         _validate_public_url(response.geturl(), kind, version, platform, redirect=True)
