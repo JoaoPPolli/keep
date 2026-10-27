@@ -13,7 +13,7 @@ import uuid
 from urllib.error import URLError
 from urllib.request import urlopen
 
-VERSION = '2.2.1'
+VERSION = '2.3.0'
 APP_FILES = (
     'server.py',
     'app_updates.py',
@@ -82,8 +82,8 @@ def validate_target(target):
             raise ValueError('Selecione a pasta do Keep que contém Iniciar Keep.bat, server.py e as pastas runtime e dist.')
     source = (target / 'server.py').read_text(encoding='utf-8')
     version = re.search(r"^VERSION\s*=\s*['\"](\d+\.\d+(?:\.\d+)?)['\"]", source, re.M)
-    if 'Keep:' not in source or not version or version.group(1) not in ('1.1', '1.1.0', '1.2', '1.2.0', '1.3', '1.3.0', '1.4', '1.4.0', '1.5', '1.5.0', '1.6', '1.6.0', '1.6.1', '1.6.2', '1.7.0', '1.8.0', '1.9.0', '1.10.0', '1.11.0', '2.0.0', '2.0.1', '2.1.0', '2.1.1', '2.2.0', VERSION):
-        raise ValueError('Esta atualização serve para o Keep 1.1 até 2.2.1. Para outras versões, use o pacote portátil completo.')
+    if 'Keep:' not in source or not version or version.group(1) not in ('1.1', '1.1.0', '1.2', '1.2.0', '1.3', '1.3.0', '1.4', '1.4.0', '1.5', '1.5.0', '1.6', '1.6.0', '1.6.1', '1.6.2', '1.7.0', '1.8.0', '1.9.0', '1.10.0', '1.11.0', '2.0.0', '2.0.1', '2.1.0', '2.1.1', '2.2.0', '2.2.1', VERSION):
+        raise ValueError('Esta atualização serve para o Keep 1.1 até 2.3.0. Para outras versões, use o pacote portátil completo.')
     for relative in APP_FILES:
         path = checked_path(target, relative)
         if path.exists() and not path.is_file():

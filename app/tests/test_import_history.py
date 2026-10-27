@@ -4,31 +4,6 @@ from urllib.request import Request,urlopen
 from unittest.mock import patch
 import test_subtitle_api as api
 import server
-from preview_media import freeze_hls
-
-class HistoryTests(unittest.TestCase):
- def test_frozen_window_has_only_complete_https_segments(self):
-  text='#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\na.ts\n#EXTINF:3.5,\nb.ts\n#EXTINF:4,\n'
-  frozen,duration=freeze_hls(text,'https://cdn.example/path/index.m3u8')
-  self.assertEqual(duration,7.5);self.assertIn('https://cdn.example/path/a.ts',frozen)
-  self.assertTrue(frozen.endswith('#EXT-X-ENDLIST\n'));self.assertNotIn('#EXTINF:4,\n#EXT-X-ENDLIST',frozen)
-  for url in ('file:///secret','http://127.0.0.1/a','https://user:secret@host/a'):
-   with self.subTest(url=url),self.assertRaises(ValueError):freeze_hls('#EXTM3U\n#EXTINF:2,\n'+url,'https://cdn.example/x')
- def test_history_preview_seeks_and_stops_at_selected_interval(self):
-  if not shutil.which('ffmpeg'):self.skipTest('FFmpeg needed')
-  with tempfile.TemporaryDirectory() as directory:
-   root=Path(directory)
-   subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','testsrc2=s=320x180:r=15:d=8','-c:v','libx264','-threads','1','-g','15','-f','hls','-hls_time','2','-hls_list_size','0',str(root/'index.m3u8')],check=True)
-   frozen,duration=freeze_hls((root/'index.m3u8').read_text(),'https://cdn.example/index.m3u8')
-   # A local file fixture exercises the real demuxer without external services.
-   frozen=frozen.replace('https://cdn.example/',root.as_uri()+'/')
-   request={'history_playlist':frozen,'history_headers':{},'start':3,'duration':2}
-   folder=root/'preview';folder.mkdir()
-   with server.preview_command(request,folder) as command:
-    result=subprocess.run(command,capture_output=True)
-   self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
-   info=server.probe_media('ffmpeg',folder/'source.mp4')
-   self.assertAlmostEqual(info['duration'],2,delta=.15)
 
 class ImportTests(unittest.TestCase):
  setUp=api.SubtitleAPITests.setUp

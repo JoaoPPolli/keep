@@ -1,4 +1,4 @@
-KEEP 2.2.1 — GUIA EM PORTUGUÊS BRASILEIRO
+KEEP 2.3.0 — GUIA EM PORTUGUÊS BRASILEIRO
 LINUX — X64 OU ARM64
 
 Esta versão traz câmera empilhada e legendas locais com prévia, além do modo Cheia.
@@ -145,7 +145,7 @@ Verificar atualização refaz a consulta. Clique em Baixar atualização para
 receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
 A consulta não baixa nem instala o pacote automaticamente.
 
-Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.2.1 do seu sistema
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.3.0 do seu sistema
 nas Preferências. Versões anteriores sem importação podem usar o atualizador
 manual com o Keep fechado. O pacote deve vir da release pública oficial em
 https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências
@@ -194,14 +194,17 @@ O vídeo abre na prévia para cortar, compor a câmera e gerar legendas.
 Clique em Baixar para salvar uma nova versão; o original fica intacto.
 A prévia pode ter qualidade menor, mas a edição usa o original importado.
 
-HISTÓRICO DE UMA LIVE
-Use Consultar histórico da live. Quando uma gravação em andamento é
-identificada, ela abre no editor normal. Caso contrário, o Keep consulta
-a janela HLS acessível. Os horários dessa janela começam em zero, e podem
-não corresponder ao começo da transmissão. Escolha até dez minutos por
-trecho HLS e prepare a prévia. Consulte novamente para obter novos momentos.
-Se a plataforma não fornecer o passado ou os segmentos expirarem, o Keep
-informa a falha. O acompanhamento e os clipes recentes continuam disponíveis.
+CÂMERA CIRCULAR
+Ative o vídeo vertical e escolha Circular. Selecione a área da câmera e a
+área do conteúdo no original. Use os controles para ajustar o tamanho e a
+posição da câmera em círculo, ou arraste o círculo na prévia do resultado.
+O conteúdo preenche o fundo vertical; a câmera aparece sobre ele.
+Cheia e Empilhado continuam disponíveis, com prévia antes de salvar.
+
+CLIPES DE LIVE
+A consulta ao histórico foi removida. Os clipes funcionam a partir do
+momento em que você clica em Acompanhar live e guardam até os últimos dois
+minutos recebidos. Não recuperam momentos anteriores ao acompanhamento.
 
 LEGENDAS NO WINDOWS
 O Keep prepara um caminho compatível para o modelo quando há acentos na

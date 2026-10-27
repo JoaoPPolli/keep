@@ -262,6 +262,27 @@ class EditorBrowserTests(unittest.TestCase):
         self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'), 390)
         self.assertTrue(self.page.locator('#vertical-preview').is_visible())
 
+    def test_circle_preview_has_transparent_corners_and_exports_its_position(self):
+        self.stacked()
+        self.page.locator('#vertical-layout-circle').click()
+        self.set_slider('circle-size',40)
+        self.set_slider('circle-x',50)
+        self.set_slider('circle-y',50)
+        self.assert_pixel(180,320,[255,0,0])
+        self.assert_pixel(112,252,[0,0,255])
+        self.assertTrue(self.page.locator('#stack-divider').is_hidden())
+        requests=self.page.evaluate('buildDownloadRequests()')
+        self.assertEqual(requests[0]['edit']['layout'],'circle')
+        self.assertEqual(requests[0]['edit']['camera_size'],.4)
+        self.assertEqual(requests[0]['edit']['camera_position'],{'x':.5,'y':.5})
+        canvas=self.page.locator('#vertical-preview');canvas.scroll_into_view_if_needed();box=canvas.bounding_box()
+        self.page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+        self.page.mouse.down();self.page.mouse.move(box['x']+box['width']*.65,box['y']+box['height']*.65,steps=5);self.page.mouse.up()
+        self.assertGreater(float(self.page.locator('#circle-x').input_value()),50)
+        self.assertGreater(float(self.page.locator('#circle-y').input_value()),50)
+        self.page.locator('#vertical-layout-full').click()
+        self.assertTrue(self.page.locator('#full-crop-controls').is_visible())
+
 
 if __name__ == '__main__':
     unittest.main()

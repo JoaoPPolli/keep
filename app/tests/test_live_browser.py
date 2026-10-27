@@ -122,27 +122,15 @@ class LiveBrowserTests(unittest.TestCase):
         self.page.locator('#vertical-layout-stacked').click()
         self.assertTrue(self.page.locator('#vertical-preview').is_visible())
 
-    def test_history_window_selection_opens_clip_in_editor(self):
-        self.routes();self.open_app()
-        self.page.locator('#video-url').fill('https://www.twitch.tv/example')
-        self.page.locator('#inspect').click()
-        self.page.wait_for_selector('#live-panel',state='visible')
-        self.context.route('**/api/live/history',lambda route:route.fulfill(content_type='application/json',body=json.dumps({'id':'history-fixture','duration':3600,'note':'Janela disponível.'})))
-        requests=[]
-        def history_clip(route):
-            requests.append(route.request.post_data_json)
-            data={'video':{'url':'https://www.twitch.tv/example','platform':'Twitch','title':'Historic','duration':2,'video_index':1,'live':False},'preview':{'id':'b'*32,'status':'ready','duration':2,'width':640,'height':360,'fps':12,'media_url':'/fixture-landscape.mp4?key=history-key'}}
-            route.fulfill(content_type='application/json',body=json.dumps(data))
-        self.context.route('**/api/live/history/clip',history_clip)
-        self.page.locator('#live-history').click()
-        self.page.wait_for_selector('#live-history-fields',state='visible')
-        self.page.locator('#live-history-start').fill('23:10')
-        self.page.locator('#live-history-end').fill('23:12')
-        self.page.locator('#live-history-preview').click()
-        self.page.wait_for_function("()=>current?.title==='Historic'&&$('preview-player').readyState>=2")
-        self.assertEqual(requests,[{'id':'history-fixture','section':{'start':1390,'end':1392}}])
-        self.assertTrue(self.page.locator('#download-button').is_enabled())
-        self.assertEqual(self.page.evaluate('current.clip.key'),'history-key')
+
+    def test_import_card_matches_layout_and_history_option_is_absent(self):
+        self.open_app()
+        self.assertEqual(self.page.locator('#live-history').count(),0)
+        self.assertTrue(self.page.locator('.import-card').is_visible())
+        self.assertTrue(self.page.locator('#choose-local-video').is_visible())
+        self.page.set_viewport_size({'width':390,'height':900})
+        self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
+        self.assertTrue(self.page.locator('#choose-local-video').is_visible())
 
 
 if __name__=='__main__':unittest.main()

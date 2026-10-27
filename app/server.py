@@ -34,7 +34,7 @@ JOBS = {}
 PROCESSES = {}
 PORT = 8765
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-VERSION = '2.2.1'
+VERSION = '2.3.0'
 IS_WINDOWS = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
 SETTINGS = {}
@@ -1669,14 +1669,6 @@ def _run_download(id, args, session_options):
 
 @contextmanager
 def preview_command(request, folder):
-    if request.get('history_playlist'):
-        (folder/'source.m3u8').write_text(request['history_playlist'],encoding='utf-8')
-        headers=''.join(k+': '+v+'\r\n' for k,v in request['history_headers'].items())
-        yield [tool_path('ffmpeg'),'-hide_banner','-nostdin','-y','-protocol_whitelist','file,https,tls,tcp,crypto',
-            '-ss',str(request['start']),'-i',str(folder/'source.m3u8'),'-t',str(request['duration']),
-            '-map','0:v:0','-map','0:a:0?','-c:v','libx264','-preset','veryfast','-threads','2',
-            '-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',str(folder/'source.mp4')]
-        return
     with cookie_options(request['browser'], request['url'], request.get('cookie_snapshot')) as options:
         command = video_command(request.get('video_index', 1), request.get('video_id')) if request['platform'] == 'X' else base_command()
         yield command + options + source_arguments(request['url']) + [
@@ -1769,59 +1761,6 @@ def run_local_clip(id):
             record_latest_download(job, folder)
             notify_completed_job(id)
 
-
-
-HISTORIES = {}
-
-def available_live_history(body):
-    from preview_media import freeze_hls
-    from urllib.request import Request
-    url, platform = validate_url(body.get('url'))
-    browser = body.get('browser', 'none')
-    snapshot = imported_cookie_text(browser, url)
-    info = metadata(url, browser, snapshot)
-    if not info.get('live') or platform not in ('YouTube','Twitch'):
-        raise ValueError('Busque uma live em andamento para consultar o histórico.')
-    # A Twitch archive can expose the entire broadcast while the channel's
-    # live HLS only exposes a short window. Require matching start timestamps.
-    if platform == 'Twitch' and info.get('started_at'):
-        archive_url = url.rstrip('/') + '/videos?filter=archives&sort=time'
-        with cookie_options(browser,url,snapshot) as options:
-            command=live_command()+options+['--flat-playlist','--dump-single-json','--skip-download','--',archive_url]
-            result=subprocess.run(command,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=60,creationflags=CREATE_FLAGS,env=process_env())
-        try:
-            entry=json.loads(result.stdout)['entries'][0]
-            candidate=entry.get('url') or ''
-            candidate,_=validate_url(candidate)
-            recorded=metadata(candidate,browser,snapshot)
-            if not recorded.get('live') and recorded.get('duration',0)>0 and abs(recorded.get('started_at',0)-info['started_at'])<120:
-                return {'video':recorded,'note':'Gravação desta transmissão disponível. A duração corresponde ao que a plataforma publicou nesta consulta.'}
-        except (ValueError,KeyError,IndexError,TypeError):
-            pass
-    with cookie_options(browser,url,snapshot) as options:
-        result=subprocess.run(live_command()+options+['-f','b[height<=720][protocol^=m3u8]/b[protocol^=m3u8]',
-            '--dump-single-json','--skip-download','--',url],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=100,creationflags=CREATE_FLAGS,env=process_env())
-    if result.returncode:
-        raise ValueError('A plataforma não disponibilizou um histórico acessível nesta live. Você ainda pode acompanhar e salvar os momentos recebidos pelo Keep.')
-    media=json.loads(result.stdout)
-    remote=media.get('url')
-    headers={k:str(v) for k,v in (media.get('http_headers') or {}).items() if k.lower() in ('user-agent','referer','origin') and '\r' not in str(v) and '\n' not in str(v)}
-    if not isinstance(remote,str) or not remote.startswith('https://'):
-        raise ValueError('Não há histórico HLS disponível nesta transmissão.')
-    with urlopen(Request(remote,headers=headers),timeout=25) as response:
-        text=response.read(8*1024*1024+1)
-        base=response.geturl()
-    if len(text)>8*1024*1024:
-        raise ValueError('O histórico excede o limite de leitura do Keep.')
-    playlist,duration=freeze_hls(text.decode('utf-8-sig'),base)
-    with LOCK:
-        now=time.monotonic()
-        for key in list(HISTORIES):
-            if now-HISTORIES[key]['created']>600:HISTORIES.pop(key)
-        while len(HISTORIES)>=8:HISTORIES.pop(next(iter(HISTORIES)))
-        id=secrets.token_urlsafe(24)
-        HISTORIES[id]={'created':now,'playlist':playlist,'headers':headers,'duration':duration,'source':info}
-    return {'id':id,'duration':duration,'note':'Janela que a plataforma disponibilizou nesta consulta. Os horários começam no início dessa janela, que pode não incluir toda a live. Atualize a consulta para ver novos momentos.'}
 
 
 def ensure_services():
@@ -2066,24 +2005,6 @@ class Handler(BaseHTTPRequestHandler):
                 request = {'url': url, 'platform': platform, 'browser': browser, 'cookie_snapshot': snapshot,
                     'video_index': info.get('video_index', 1), 'video_id': info.get('video_id') if platform == 'X' else None}
                 return self.respond(202, PREVIEWS.create(request, duration=info.get('duration')))
-            if self.path == '/api/live/history':
-                return self.respond(200, available_live_history(body))
-            if self.path == '/api/live/history/clip':
-                ensure_services()
-                with LOCK:
-                    history=HISTORIES.get(body.get('id'))
-                    if not history or time.monotonic()-history['created']>600:
-                        raise ValueError('O histórico expirou. Consulte novamente a live.')
-                    section=validate_section(body.get('section'),history['duration'])
-                    if not section or section['end']-section['start']>600:
-                        raise ValueError('Escolha um trecho de até dez minutos do histórico.')
-                    duration=section['end']-section['start']
-                    source=history['source']
-                    request={'history_playlist':history['playlist'],'history_headers':history['headers'],
-                        'start':section['start'],'duration':duration,'history_clip':True}
-                preview=PREVIEWS.create(request,duration=duration)
-                return self.respond(202, {'preview':preview,'video':dict(source,live=False,kind='Trecho do histórico',
-                    duration=duration,video_index=1,items=None,inspection_id=None)})
             if self.path == '/api/live/start':
                 ensure_services()
                 if SHUTTING_DOWN:

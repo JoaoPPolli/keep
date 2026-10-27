@@ -347,7 +347,7 @@ class PreviewManager:
             now = time.monotonic()
             valid_duration = isinstance(duration, (int, float)) and not isinstance(duration, bool) and math.isfinite(duration) and duration > 0
             item = _Preview(id, key, folder, request, now, now, duration if valid_duration else None)
-            item.live_clip = isinstance(request, dict) and bool(request.get('local_clip') or request.get('history_clip'))
+            item.live_clip = isinstance(request, dict) and bool(request.get('local_clip'))
             item.imported = isinstance(request,dict) and request.get('imported') is True
             self._items[id] = item
             item.thread = threading.Thread(target=self._prepare, args=(item,), daemon=True, name='Keep-preview-' + id)
@@ -615,15 +615,13 @@ class PreviewManager:
                 raise ValueError('A plataforma não entregou o arquivo da prévia. Tente novamente.')
             source = sources[0]
             source_duration, probe = self._probe(item, source, deadline)
-            if item.request.get('history_clip') and abs(source_duration-item.expected_duration)>.25:
-                raise ValueError('O histórico mudou ou ficou incompleto. Consulte novamente a live e escolha o trecho.')
             with self._lock:
                 item.stage = 'Preparando o vídeo para assistir no Keep…'
             target = item.folder / 'preview.mp4'
             video_line = next((line for line in probe.splitlines() if 'Video:' in line), '')
             dimensions = re.search(r'\b(\d{2,5})x(\d{2,5})\b', video_line)
             within_height = bool(dimensions) and int(dimensions.group(2)) <= 480
-            copy = (within_height or bool(local_clip) or item.request.get('history_clip')) and bool(re.search(r'Video:\s*h264(?:\s|\()', video_line)) and bool(re.search(r',\s*yuv420p(?:\(|,|\s)', video_line)) and (
+            copy = (within_height or bool(local_clip)) and bool(re.search(r'Video:\s*h264(?:\s|\()', video_line)) and bool(re.search(r',\s*yuv420p(?:\(|,|\s)', video_line)) and (
                 'Audio:' not in probe or bool(re.search(r'Audio:\s*aac(?:\s|\()', probe)))
             command = [self.ffmpeg, '-hide_banner', '-nostdin', '-y', '-i', source, '-map', '0:v:0', '-map', '0:a:0?', '-sn', '-dn']
             if copy:
@@ -1364,46 +1362,3 @@ class LiveManager:
             self.stop(session['id'])
             if not session['thread'].is_alive():
                 session['temp'].cleanup()
-
-
-def freeze_hls(text, base):
-    """Freeze only complete media segments; never follow paths from the browser."""
-    from urllib.parse import urljoin, urlparse
-    def remote(value):
-        url = urljoin(base, value)
-        parsed = urlparse(url)
-        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError('O histórico contém um endereço de mídia incompatível.')
-        return url
-    if not text.startswith('#EXTM3U') or '#EXT-X-STREAM-INF' in text:
-        raise ValueError('A plataforma não disponibilizou um histórico de vídeo direto.')
-    output = ['#EXTM3U', '#EXT-X-PLAYLIST-TYPE:VOD']
-    duration = 0
-    pending = []
-    length = None
-    count = 0
-    for raw in text.splitlines()[1:]:
-        line = raw.strip()
-        if line.startswith('#EXTINF:'):
-            length = float(line.split(':', 1)[1].split(',')[0])
-            if not math.isfinite(length) or length <= 0:
-                raise ValueError('O histórico tem durações inválidas.')
-            pending.append(line)
-        elif line.startswith(('#EXT-X-KEY:', '#EXT-X-MAP:')):
-            line = re.sub(r'URI="([^"]+)"', lambda m: 'URI="' + remote(m[1]) + '"', line)
-            if 'URI=' in line and not re.search(r'URI="https://[^"\r\n]+"',line):
-                raise ValueError('O histórico contém uma chave incompatível.')
-            pending.append(line)
-        elif line.startswith(('#EXT-X-TARGETDURATION:', '#EXT-X-MEDIA-SEQUENCE:', '#EXT-X-DISCONTINUITY', '#EXT-X-BYTERANGE:')):
-            pending.append(line)
-        elif line and not line.startswith('#'):
-            if length is None:
-                raise ValueError('O histórico contém um segmento sem duração.')
-            output.extend(pending);output.append(remote(line));pending=[]
-            duration += length;length = None;count += 1
-            if count > 20000 or duration > 48 * 3600:
-                raise ValueError('O histórico excede o limite de leitura do Keep.')
-    if not count:
-        raise ValueError('Ainda não há trechos anteriores disponíveis nesta live.')
-    output.append('#EXT-X-ENDLIST')
-    return '\n'.join(output)+'\n', duration

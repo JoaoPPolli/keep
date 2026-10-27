@@ -50,6 +50,7 @@ NOTES = {
     ],
     '2.2.0': ['Legendas: modelo oficial de inglês, preparação de caminhos compatíveis no Windows e opção para reparar os modelos.', 'Correção do painel de live que permanecia ao trocar para um vídeo normal; o acompanhamento anterior é encerrado.', 'Cortes do YouTube: alternativa de baixar a origem e montar os trechos localmente quando o corte remoto falhar.', 'Importação de vídeos do PC para cortar, compor a câmera e legendar, preservando o arquivo original.', 'Consulta ao histórico disponível da live: gravação em andamento quando identificada ou janela HLS acessível, com escolha de horários.'],
     '2.2.1': ['Consulta automática de novas versões a cada cinco minutos com a aba visível e ao voltar para o Keep.', 'Consultas ao canal público com chave de cache renovada para evitar resultados antigos. O download e a instalação continuam sob sua escolha.'],
+    '2.3.0': ['Importação de vídeos do PC com cartão, ícone e botão integrados ao visual do Keep.', 'Modo Circular no editor vertical: câmera em círculo sobre o conteúdo, com tamanho e posição ajustáveis na prévia e no vídeo exportado.', 'Removida a opção "Consultar histórico de live". Não funcionou dentro das expectativas. A função de clipes de live só funcionara após o momento que você clicar em "Acompanhar live" e até os últimos 2 minutos após isso.'],
 }
 
 

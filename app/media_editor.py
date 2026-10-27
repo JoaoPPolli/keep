@@ -168,21 +168,30 @@ def validate_edit(body, duration):
     if any(not 0 <= value <= 1 for value in crop.values()):
         raise ValueError('O enquadramento precisa ficar dentro da imagem.')
     layout = body.get('layout', 'full')
-    if layout not in ('full', 'stacked'):
-        raise ValueError('Escolha o modo Cheia ou Empilhado.')
+    if layout not in ('full', 'stacked', 'circle'):
+        raise ValueError('Escolha o modo Cheia, Empilhado ou Circular.')
     result = {'sections': normalized, 'mode': mode, 'vertical': vertical, 'crop': crop,
               'duration': round(total, 3), 'layout': layout}
-    if layout == 'stacked':
+    if layout in ('stacked','circle'):
         if mode != 'video' or not vertical:
             raise ValueError('O modo Empilhado está disponível para vídeo vertical MP4.')
         result['camera'] = normalized_rectangle(body.get('camera', {
             'x': 0, 'y': 0, 'width': .28, 'height': .28}), 'a câmera')
         result['content'] = normalized_rectangle(body.get('content', {
             'x': .25, 'y': 0, 'width': .5, 'height': 1}), 'o conteúdo')
-        share = number(body.get('camera_height', .3), 'a altura da câmera')
-        if not .15 <= share <= .6:
-            raise ValueError('A câmera deve ocupar entre 15% e 60% da altura vertical.')
-        result['camera_height'] = share
+        if layout=='stacked':
+            share = number(body.get('camera_height', .3), 'a altura da câmera')
+            if not .15 <= share <= .6:
+                raise ValueError('A câmera deve ocupar entre 15% e 60% da altura vertical.')
+            result['camera_height'] = share
+        else:
+            size=number(body.get('camera_size',.35),'o tamanho da câmera')
+            position=body.get('camera_position',{'x':.05,'y':.05})
+            if not .2<=size<=.6 or not isinstance(position,dict) or set(position)!={'x','y'}:
+                raise ValueError('Escolha um tamanho entre 20% e 60% e uma posição válida para a câmera.')
+            position={k:number(position[k],'a posição da câmera') for k in ('x','y')}
+            if any(not 0<=v<=1 for v in position.values()):raise ValueError('A câmera precisa ficar dentro do vídeo.')
+            result.update(camera_size=size,camera_position=position)
     captions = validate_captions(body.get('captions'), duration)
     if captions:
         if mode != 'video':
@@ -235,6 +244,30 @@ def stacked_geometry(edit, info):
             'camera_height': camera_height, 'content_height': content_height,
             'camera': selection(edit['camera'], 'a câmera', camera_height),
             'content': selection(edit['content'], 'o conteúdo', content_height)}
+
+
+
+def circle_geometry(edit, info):
+    width,height=info['width'],info['height']
+    even=lambda value:2*math.floor(value/2)
+    units=math.floor(min(width,1080)/18)
+    if units<1 or height<2:raise ValueError('A imagem é pequena demais para compor a câmera.')
+    w,h=18*units,32*units
+    diameter=even(w*edit['camera_size'])
+    def cover(region,pw,ph):
+        r=normalized_rectangle(region,'a seleção')
+        left,top=even(r['x']*width),even(r['y']*height)
+        rw,rh=min(even(r['width']*width),even(width-left)),min(even(r['height']*height),even(height-top))
+        if min(rw,rh)<2:raise ValueError('A seleção é pequena demais.')
+        cw,ch=rw,rh
+        if rw/rh>pw/ph:cw=even(rh*pw/ph)
+        else:ch=even(rw*ph/pw)
+        if min(cw,ch)<2:raise ValueError('Aumente a seleção da câmera ou do conteúdo.')
+        return {'x':left+even((rw-cw)/2),'y':top+even((rh-ch)/2),'width':cw,'height':ch}
+    position=edit['camera_position']
+    return {'width':w,'height':h,'diameter':diameter,'left':even((w-diameter)*position['x']),
+            'top':even((h-diameter)*position['y']),'camera':cover(edit['camera'],diameter,diameter),
+            'content':cover(edit['content'],w,h)}
 
 
 def probe_media(ffmpeg, path, env=None):
@@ -298,14 +331,15 @@ def transform_command(ffmpeg, source, target, edit, info, offset=0, caption_dir=
     has_audio = info['audio'] and edit['mode'] != 'gif'
     vertical = edit['vertical']
     stacked = edit.get('layout', 'full') == 'stacked'
-    if stacked and (not vertical or edit['mode'] != 'video'):
+    circular = edit.get('layout') == 'circle'
+    if (stacked or circular) and (not vertical or edit['mode'] != 'video'):
         raise ValueError('O modo Empilhado está disponível para vídeo vertical MP4.')
     note = alignment_note
     if vertical:
         width, height = info.get('width'), info.get('height')
         if not width or not height:
             raise ValueError('Não foi possível conferir as dimensões para converter em 9:16.')
-        if not stacked and abs(width / height - 9 / 16) < .015:
+        if not stacked and not circular and abs(width / height - 9 / 16) < .015:
             vertical = False
             note = (note + ' ' if note else '') + 'O vídeo já está em 9:16. O corte foi salvo sem reenquadrar.'
     for index, section in enumerate(edit['sections']):
@@ -338,13 +372,24 @@ def transform_command(ffmpeg, source, target, edit, info, offset=0, caption_dir=
                                f'setsar=1[{pane}_out]')
             filters.append('[camera_out][content_out]vstack=inputs=2[vstack]')
             video_label = 'vstack'
+        elif circular:
+            geometry=circle_geometry(edit,info)
+            filters.append('[vjoin]split=2[camera_in][content_in]')
+            for pane in ('camera','content'):
+                rectangle=geometry[pane]
+                pw=geometry['diameter'] if pane=='camera' else geometry['width']
+                ph=geometry['diameter'] if pane=='camera' else geometry['height']
+                filters.append(f'[{pane}_in]crop={rectangle["width"]}:{rectangle["height"]}:{rectangle["x"]}:{rectangle["y"]},scale={pw}:{ph},setsar=1[{pane}_scaled]')
+            filters.append("[camera_scaled]format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(pow(X-W/2,2)+pow(Y-H/2,2),pow(W/2,2)),255,0)'[camera_round]")
+            filters.append(f'[content_scaled][camera_round]overlay=x={geometry["left"]}:y={geometry["top"]}:shortest=1:format=auto[vcircle]')
+            video_label='vcircle'
         tail = []
         if edit.get('_frame_ranges'):
             # concat's video-only segments can omit the last frame duration.
             # Frame-aligned cuts already use a constant frame clock; retain
             # every selected frame and rebuild that clock after joining.
             tail.append(f'setpts=N/({edit['_frame_rate']:.9f}*TB)')
-        if vertical and not stacked:
+        if vertical and not stacked and not circular:
             x, y = edit['crop']['x'], edit['crop']['y']
             tail.append("crop=w='trunc(min(iw,ih*9/16)/18)*18':h='trunc(min(ih,iw*16/9)/32)*32':"
                         + f"x='(iw-ow)*{x:.6f}':y='(ih-oh)*{y:.6f}'")
@@ -356,7 +401,7 @@ def transform_command(ffmpeg, source, target, edit, info, offset=0, caption_dir=
             if edit.get('captions'):
                 if caption_dir is None:
                     raise ValueError('Não foi possível preparar as legendas da exportação.')
-                if stacked:
+                if stacked or circular:
                     output_width = geometry['width']
                 elif vertical:
                     output_width = math.floor(min(info['width'], info['height'] * 9 / 16) / 18) * 18

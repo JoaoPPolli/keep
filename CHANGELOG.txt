@@ -1,15 +1,21 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.2.1
+Versão atual: 2.3.0
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.2.1
+https://github.com/JoaoPPolli/keep/releases/tag/v2.3.0
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.3.0 — Câmera circular e ajustes da interface
+
+- Importação de vídeos do PC com cartão, ícone e botão integrados ao visual do Keep.
+- Modo Circular no editor vertical: câmera em círculo sobre o conteúdo, com tamanho e posição ajustáveis na prévia e no vídeo exportado.
+- Removida a opção "Consultar histórico de live". Não funcionou dentro das expectativas. A função de clipes de live só funcionara após o momento que você clicar em "Acompanhar live" e até os últimos 2 minutos após isso.
 
 2.2.1 — Consulta automática de atualizações
 
