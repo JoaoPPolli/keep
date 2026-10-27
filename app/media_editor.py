@@ -282,7 +282,7 @@ def frame_aligned_edit(edit, info, offset=0):
         ranges.append((first, last))
         sections.append({'start': start, 'end': end})
     result = dict(edit, sections=sections, duration=sum((last-first)/fps for first,last in ranges),
-                  _frame_aligned=True, _frame_ranges=ranges)
+                  _frame_aligned=True, _frame_ranges=ranges, _frame_rate=fps)
     if edit['mode'] == 'gif' and result['duration'] > 30 + 1e-9:
         raise ValueError('Após ajustar aos quadros, o GIF passa de 30 segundos. Reduza um dos trechos.')
     note = ('Os limites dos trechos foram ajustados aos quadros do arquivo baixado; '
@@ -339,11 +339,11 @@ def transform_command(ffmpeg, source, target, edit, info, offset=0, caption_dir=
             filters.append('[camera_out][content_out]vstack=inputs=2[vstack]')
             video_label = 'vstack'
         tail = []
-        if edit.get('_frame_ranges') and info.get('fps'):
+        if edit.get('_frame_ranges'):
             # concat's video-only segments can omit the last frame duration.
             # Frame-aligned cuts already use a constant frame clock; retain
             # every selected frame and rebuild that clock after joining.
-            tail.append(f'setpts=N/({info["fps"]:.9f}*TB)')
+            tail.append(f'setpts=N/({edit['_frame_rate']:.9f}*TB)')
         if vertical and not stacked:
             x, y = edit['crop']['x'], edit['crop']['y']
             tail.append("crop=w='trunc(min(iw,ih*9/16)/18)*18':h='trunc(min(ih,iw*16/9)/32)*32':"
@@ -377,6 +377,8 @@ def transform_command(ffmpeg, source, target, edit, info, offset=0, caption_dir=
         command += ['-map', '[vout]']
         if has_audio:
             command += ['-map', '[aout]', '-c:a', 'aac', '-b:a', '160k']
+        if edit.get('_frame_ranges'):
+            command += ['-r', f"{edit['_frame_rate']:.9f}", '-fps_mode', 'cfr']
         command += ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-threads', '2', '-movflags', '+faststart']
     return command + [str(target)], note
 

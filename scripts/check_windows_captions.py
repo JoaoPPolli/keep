@@ -16,7 +16,7 @@ def report_failure(kind, value, tb):
     message=message.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
     print('::error title=Windows speech validation::'+message)
 sys.excepthook=report_failure
-with tempfile.TemporaryDirectory(prefix='keep-windows-asr-') as temporary:
+with tempfile.TemporaryDirectory(prefix='keep-windows-asr-', ignore_cleanup_errors=True) as temporary:
     root=Path(temporary)/'Keep João 日本語';root.mkdir()
     native_name,native_hash=CAPTION_NATIVE['windows-x64']
     print('Preparing Windows DLL',flush=True)
