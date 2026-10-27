@@ -31,7 +31,19 @@ jobs:
         with:
           python-version: '3.12'
       - name: Recognize real speech with the production DLL and Unicode model path
-        run: python scripts/check_windows_captions.py
+        shell: pwsh
+        run: |
+          $env:PYTHONIOENCODING = 'utf-8'
+          $keepLog = Join-Path $env:RUNNER_TEMP 'keep-windows-asr.log'
+          python -u -X utf8 scripts/check_windows_captions.py *> $keepLog
+          $keepExit = $LASTEXITCODE
+          $keepText = Get-Content -Raw -Encoding utf8 $keepLog
+          Write-Output $keepText
+          if ($keepExit -ne 0) {
+            $keepMessage = $keepText.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Windows speech output::$keepMessage"
+            exit $keepExit
+          }
 
   publish:
     needs: windows-captions

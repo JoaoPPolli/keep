@@ -7,6 +7,8 @@ import tempfile
 import threading
 from urllib.request import urlopen
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'app'))
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 from preview_media import CAPTION_NATIVE,CAPTION_MODELS,_caption_component,_CaptionRecognizer
 def report_failure(kind, value, tb):
     import traceback
@@ -17,12 +19,15 @@ sys.excepthook=report_failure
 with tempfile.TemporaryDirectory(prefix='keep-windows-asr-') as temporary:
     root=Path(temporary)/'Keep João 日本語';root.mkdir()
     native_name,native_hash=CAPTION_NATIVE['windows-x64']
+    print('Preparing Windows DLL',flush=True)
     native=_caption_component(root,native_name[:-4],'https://github.com/alphacep/vosk-api/releases/download/v0.3.45/'+native_name,native_hash,threading.Event())
     model=CAPTION_MODELS['en']
+    print('Preparing official English model',flush=True)
     model_path=_caption_component(root,model['name'],model['url'],model['sha256'],threading.Event())
     with urlopen('https://raw.githubusercontent.com/alphacep/vosk-api/master/python/example/test.wav',timeout=30) as response:sample=response.read()
     assert hashlib.sha256(sample).hexdigest()=='dcfea5712c43a43ba7ae8083afb39d36993e5a69c46e88b68aaa72b65cb615bb'
     audio=root/'speech.wav';audio.write_bytes(sample)
+    print('Loading Windows DLL and English model',flush=True)
     recognizer=_CaptionRecognizer(native/'libvosk.dll',model_path)
     try:
         cues=recognizer.transcribe(audio,threading.Event(),lambda progress:None)

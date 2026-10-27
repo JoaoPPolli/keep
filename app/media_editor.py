@@ -339,6 +339,11 @@ def transform_command(ffmpeg, source, target, edit, info, offset=0, caption_dir=
             filters.append('[camera_out][content_out]vstack=inputs=2[vstack]')
             video_label = 'vstack'
         tail = []
+        if edit.get('_frame_ranges') and info.get('fps'):
+            # concat's video-only segments can omit the last frame duration.
+            # Frame-aligned cuts already use a constant frame clock; retain
+            # every selected frame and rebuild that clock after joining.
+            tail.append(f'setpts=N/({info["fps"]:.9f}*TB)')
         if vertical and not stacked:
             x, y = edit['crop']['x'], edit['crop']['y']
             tail.append("crop=w='trunc(min(iw,ih*9/16)/18)*18':h='trunc(min(ih,iw*16/9)/32)*32':"
