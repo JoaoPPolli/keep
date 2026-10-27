@@ -8,6 +8,12 @@ import threading
 from urllib.request import urlopen
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'app'))
 from preview_media import CAPTION_NATIVE,CAPTION_MODELS,_caption_component,_CaptionRecognizer
+def report_failure(kind, value, tb):
+    import traceback
+    message=''.join(traceback.format_exception(kind,value,tb))
+    message=message.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+    print('::error title=Windows speech validation::'+message)
+sys.excepthook=report_failure
 with tempfile.TemporaryDirectory(prefix='keep-windows-asr-') as temporary:
     root=Path(temporary)/'Keep João 日本語';root.mkdir()
     native_name,native_hash=CAPTION_NATIVE['windows-x64']
