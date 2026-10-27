@@ -695,8 +695,6 @@ CAPTION_MODELS = {
         'sha256': '30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498',
     },
 }
-CAPTION_MAX_DURATION = 7200
-CAPTION_MAX_CUES = 4000
 
 
 class _CaptionCancelled(Exception):
@@ -716,8 +714,6 @@ def caption_cues(words):
                      'end': round(max(group[-1]['end'], group[0]['start'] + .1), 3),
                      'text': text[0].upper() + text[1:]})
         group.clear()
-        if len(cues) > CAPTION_MAX_CUES:
-            raise ValueError('Há legendas demais neste vídeo. Escolha um trecho menor.')
 
     if not isinstance(words, list):
         raise ValueError('O reconhecedor não retornou palavras válidas.')
@@ -727,7 +723,7 @@ def caption_cues(words):
         start, end, text = item.get('start'), item.get('end'), item.get('word')
         if (type(start) not in (int, float) or type(end) not in (int, float)
                 or not math.isfinite(start) or not math.isfinite(end)
-                or not 0 <= start < end <= CAPTION_MAX_DURATION + .1
+                or not 0 <= start < end
                 or start < previous - .05 or not isinstance(text, str)):
             raise ValueError('O reconhecedor retornou um horário inválido.')
         text = ' '.join(''.join(c for c in text if ord(c) >= 32).split())
@@ -931,8 +927,6 @@ class _CaptionRecognizer:
                 total = audio.getnframes()
                 if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or audio.getframerate() != 16000:
                     raise ValueError('O áudio da prévia não pôde ser preparado para as legendas.')
-                if total > (CAPTION_MAX_DURATION + .1) * 16000:
-                    raise ValueError('Escolha um vídeo de até duas horas para legendar.')
                 read = 0
                 while content := audio.readframes(4000):
                     if cancelled.is_set():
@@ -975,7 +969,7 @@ class SubtitleManager:
         return {**{key: task[key] for key in ('id', 'preview_id', 'language', 'status', 'stage', 'progress', 'error')},
                 'cues': [dict(cue) for cue in task['cues']]}
 
-    def create(self, source, language='pt', preview_id='', duration=None):
+    def create(self, source, language='pt', preview_id='', duration=None, sections=None):
         if language not in CAPTION_MODELS:
             raise ValueError('Escolha um idioma disponível para as legendas.')
         if not self.ffmpeg:
@@ -983,8 +977,18 @@ class SubtitleManager:
         source = Path(source).absolute()
         if not source.is_file() or any(_is_link(p) for p in (source, *source.parents)):
             raise ValueError('Prepare novamente a prévia antes de gerar as legendas.')
-        if duration is not None and (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= CAPTION_MAX_DURATION):
-            raise ValueError('Escolha um vídeo de até duas horas para legendar.')
+        if duration is not None and (type(duration) not in (int, float) or not math.isfinite(duration) or not duration > 0):
+            raise ValueError('A duração do vídeo é inválida.')
+        if sections is not None:
+            from media_editor import validate_edit
+            if duration is None:raise ValueError('Prepare uma prévia com duração informada.')
+            requested=validate_edit({'sections':sections},duration)['sections']
+            merged=[]
+            for section in sorted(requested,key=lambda part:part['start']):
+                if merged and section['start']<=merged[-1]['end']:
+                    merged[-1]['end']=max(merged[-1]['end'],section['end'])
+                else:merged.append(dict(section))
+            sections=merged
         with self._lock:
             if self._closed:
                 raise ValueError('O Keep está fechando.')
@@ -997,7 +1001,7 @@ class SubtitleManager:
                     break
                 del self._tasks[old]
             task = {'id': secrets.token_hex(16), 'preview_id': str(preview_id), 'language': language,
-                    'status': 'queued', 'stage': 'Aguardando o reconhecedor local…', 'progress': 0,
+                    'sections':sections,'duration':duration,'status': 'queued', 'stage': 'Aguardando o reconhecedor local…', 'progress': 0,
                     'cues': [], 'error': None, 'cancelled': threading.Event(), 'process': None}
             self._tasks[task['id']] = task
             self._executor.submit(self._run, task, source)
@@ -1048,6 +1052,44 @@ class SubtitleManager:
         self._engine = _CaptionRecognizer(library, model_path); self._language = language
         return self._engine
 
+    def _recognize_sections(self, task, source, folder, engine):
+        # Small WAV files keep long videos compatible with RIFF and Python's
+        # wave reader. Only requested source intervals are decoded.
+        intervals=task['sections']
+        if intervals is None:
+            from media_editor import probe_media
+            duration=task.get('duration') or probe_media(self.ffmpeg,source,self.process_env() if callable(self.process_env) else self.process_env)['duration']
+            intervals=[{'start':0,'end':duration}]
+        chunks=[]
+        for section in intervals:
+            start=section['start']
+            while start<section['end']-.000001:
+                end=min(section['end'],start+1200)
+                chunks.append((start,end));start=end
+        total=sum(end-start for start,end in chunks);elapsed=0;cues=[]
+        self._update(task,status='transcribing',progress=0)
+        for index,(start,end) in enumerate(chunks):
+            if task['cancelled'].is_set():raise _CaptionCancelled()
+            audio=folder/'audio.wav'
+            self._update(task,stage=f'Preparando o áudio selecionado ({index+1}/{len(chunks)})…')
+            with (folder/'ffmpeg.log').open('wb') as log:
+                process=subprocess.Popen([self.ffmpeg,'-hide_banner','-nostdin','-v','error','-y','-ss',str(start),'-i',str(source),
+                    '-t',str(end-start),'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',str(audio)],
+                    stdout=subprocess.DEVNULL,stderr=log,creationflags=CREATE_FLAGS,start_new_session=os.name!='nt',
+                    env=self.process_env() if callable(self.process_env) else self.process_env)
+                process._keep_group=os.name!='nt';self._update(task,process=process)
+                while process.poll() is None:
+                    if task['cancelled'].wait(.1):terminate_tree(process);raise _CaptionCancelled()
+                self._update(task,process=None)
+                if process.returncode:raise ValueError('Não foi possível preparar o áudio selecionado. Confira se o vídeo contém áudio.')
+            self._update(task,stage=f'Reconhecendo o trecho selecionado ({index+1}/{len(chunks)})…')
+            batch=engine.transcribe(audio,task['cancelled'],lambda progress:self._update(task,progress=min(99,round((elapsed+(end-start)*progress/100)/total*100))))
+            for cue in batch:
+                a,b=max(start,start+cue['start']),min(end,start+cue['end'])
+                if b>a and round(b,3)>round(a,3):cues.append({'start':round(a,3),'end':round(b,3),'text':cue['text']})
+            elapsed+=end-start;audio.unlink(missing_ok=True)
+        return cues
+
     def _run(self, task, source):
         import shutil
         import tempfile
@@ -1062,31 +1104,7 @@ class SubtitleManager:
                 raise ValueError('A pasta temporária de legendas não pode ser um vínculo.')
             self.cache.mkdir(parents=True, exist_ok=True)
             folder = Path(tempfile.mkdtemp(prefix='caption-', dir=self.cache))
-            audio = folder / 'audio.wav'
-            self._update(task, status='transcribing', stage='Preparando o áudio da prévia…')
-            log_path = folder / 'ffmpeg.log'
-            with log_path.open('wb') as log:
-                process = subprocess.Popen([self.ffmpeg, '-hide_banner', '-nostdin', '-v', 'error', '-y', '-i', str(source),
-                    '-t', str(CAPTION_MAX_DURATION + .01), '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', str(audio)],
-                    stdout=subprocess.DEVNULL, stderr=log, creationflags=CREATE_FLAGS,
-                    start_new_session=os.name != 'nt', env=self.process_env() if callable(self.process_env) else self.process_env)
-                process._keep_group = os.name != 'nt'
-                self._update(task, process=process)
-                started = time.monotonic()
-                while process.poll() is None:
-                    if task['cancelled'].is_set() or time.monotonic() - started > 1800:
-                        terminate_tree(process)
-                        if task['cancelled'].is_set():
-                            raise _CaptionCancelled()
-                        raise ValueError('O áudio demorou demais para preparar. Escolha um trecho menor.')
-                    time.sleep(.1)
-                self._update(task, process=None)
-                if task['cancelled'].is_set():
-                    raise _CaptionCancelled()
-                if process.returncode:
-                    raise ValueError('A prévia não tem áudio disponível para gerar legendas ou o áudio está inválido.')
-            self._update(task, stage='Reconhecendo a fala no seu computador…')
-            cues = engine.transcribe(audio, task['cancelled'], lambda progress: self._update(task, progress=progress))
+            cues=self._recognize_sections(task,source,folder,engine)
             if task['cancelled'].is_set():
                 raise _CaptionCancelled()
             if not cues:

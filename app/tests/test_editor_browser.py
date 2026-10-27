@@ -283,6 +283,26 @@ class EditorBrowserTests(unittest.TestCase):
         self.page.locator('#vertical-layout-full').click()
         self.assertTrue(self.page.locator('#full-crop-controls').is_visible())
 
+    def test_caption_request_uses_only_selected_interval_and_blocks_expansion(self):
+        self.prepare_crop();self.mock_captions(cues=[{'start':.21,'end':.7,'text':'Só o trecho'}])
+        self.page.locator('#section-start').fill('0:00.2')
+        self.page.locator('#section-end').fill('0:00.8')
+        self.page.locator('#captions-enabled').check()
+        self.page.locator('#generate-captions').click()
+        self.page.wait_for_function("()=>captionState==='ready'")
+        self.assertEqual(self.caption_requests[0]['sections'],[{'start':.2,'end':.8}])
+        self.assertEqual(self.page.evaluate('captionSections'),[{'start':.2,'end':.8}])
+        self.assertIn('margem de erro grande',self.page.locator('.caption-warning').inner_text())
+        self.page.locator('#section-end').fill('0:01.5')
+        self.assertTrue(self.page.locator('#download-button').is_disabled())
+        self.assertIn('seleção mudou',self.page.locator('#section-summary').inner_text())
+
+    def test_bola_label_and_long_edit_has_no_two_hour_cap(self):
+        self.prepare_crop()
+        self.assertIn('Bola',self.page.locator('#vertical-layout-circle').inner_text())
+        request=self.page.evaluate("()=>{current.duration=12000;$('section-start').value='0:00';$('section-end').value='3:00:00';return buildDownloadRequests()[0];}")
+        self.assertEqual(request['edit']['sections'],[{'start':0,'end':10800}])
+
 
 if __name__ == '__main__':
     unittest.main()

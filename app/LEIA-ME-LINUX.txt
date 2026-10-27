@@ -1,4 +1,4 @@
-KEEP 2.3.0 — GUIA EM PORTUGUÊS BRASILEIRO
+KEEP 2.4.0 — GUIA EM PORTUGUÊS BRASILEIRO
 LINUX — X64 OU ARM64
 
 Esta versão traz câmera empilhada e legendas locais com prévia, além do modo Cheia.
@@ -64,7 +64,7 @@ e a interface avisará. A prévia pode ter qualidade menor que o arquivo final.
 Adicione até 24 trechos à lista. Escolha arquivos separados ou uma montagem
 na ordem da lista. Você pode reordenar ou remover os trechos. Os limites de
 montagens podem ser ajustados aos quadros do arquivo baixado, com aviso e
-duração final. Cada montagem tem limite de duas horas. Trechos distantes,
+duração final. Montagens não têm teto fixo de duração. Trechos distantes,
 quando unidos, podem exigir bastante tempo e espaço temporário; escolha
 arquivos separados para baixar apenas cada intervalo.
 
@@ -95,7 +95,7 @@ ruído, música e falas sobrepostas podem prejudicar o reconhecimento.
 As legendas aparecem no resultado da prévia, no mesmo instante do original,
 e são gravadas no vídeo MP4 exportado. Desative a opção para exportar sem elas.
 Os efeitos podem ser aplicados ao vídeo inteiro ou aos trechos escolhidos.
-Para legendar, use vídeos gravados de até duas horas.
+Para legendar, confira a seleção antes de gerar. Só os trechos selecionados são reconhecidos.
 
 O arquivo só é marcado como concluído após a conferência da edição. Um nome
 que já exista na pasta é preservado. A limpeza de falhas do editor remove
@@ -145,7 +145,7 @@ Verificar atualização refaz a consulta. Clique em Baixar atualização para
 receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
 A consulta não baixa nem instala o pacote automaticamente.
 
-Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.3.0 do seu sistema
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.4.0 do seu sistema
 nas Preferências. Versões anteriores sem importação podem usar o atualizador
 manual com o Keep fechado. O pacote deve vir da release pública oficial em
 https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências
@@ -189,13 +189,13 @@ pacotes e atualização manual em instalações isoladas. Reconhecimento de fala
 Integrações de menu e notificações dependem da sessão gráfica do computador.
 
 IMPORTAR VÍDEOS DO PC
-Clique em Importar vídeo do PC e selecione um arquivo de até 1 GB.
+Clique em Importar vídeo do PC e selecione um arquivo sem limite fixo de tamanho.
 O vídeo abre na prévia para cortar, compor a câmera e gerar legendas.
 Clique em Baixar para salvar uma nova versão; o original fica intacto.
 A prévia pode ter qualidade menor, mas a edição usa o original importado.
 
-CÂMERA CIRCULAR
-Ative o vídeo vertical e escolha Circular. Selecione a área da câmera e a
+CÂMERA EM BOLA
+Ative o vídeo vertical e escolha Bola. Selecione a área da câmera e a
 área do conteúdo no original. Use os controles para ajustar o tamanho e a
 posição da câmera em círculo, ou arraste o círculo na prévia do resultado.
 O conteúdo preenche o fundo vertical; a câmera aparece sobre ele.
@@ -214,3 +214,11 @@ e depois Gerar legendas para baixar novamente o idioma oficial verificado.
 CORTES DO YOUTUBE
 Se o corte remoto falhar, o Keep tenta baixar a origem e cortar localmente.
 Isso pode usar mais tempo e espaço temporário, principalmente em vídeos longos.
+
+LEGENDAS: RESULTADO APROXIMADO
+As legendas automáticas não são perfeitas e podem ter uma margem de erro
+grande. Revise todo o texto. Selecione os trechos antes de gerar: somente
+esses intervalos são reconhecidos. Ao ampliar a seleção, gere novamente.
+O app processa áudio em partes para suportar vídeos longos. Não há teto
+fixo de tamanho na importação nem de duração na edição; é necessário
+espaço livre para as cópias temporárias e o arquivo de saída.

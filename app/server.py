@@ -34,7 +34,7 @@ JOBS = {}
 PROCESSES = {}
 PORT = 8765
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-VERSION = '2.3.0'
+VERSION = '2.4.0'
 IS_WINDOWS = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
 SETTINGS = {}
@@ -1672,7 +1672,7 @@ def preview_command(request, folder):
     with cookie_options(request['browser'], request['url'], request.get('cookie_snapshot')) as options:
         command = video_command(request.get('video_index', 1), request.get('video_id')) if request['platform'] == 'X' else base_command()
         yield command + options + source_arguments(request['url']) + [
-            '--no-continue', '--no-simulate', '--no-progress', '--max-filesize', '1G',
+            '--no-continue', '--no-simulate', '--no-progress',
             '-f', 'bv*[height<=480]+ba/b[height<=480]/b[height<=720]',
             '-S', 'res,proto:https', '--merge-output-format', 'mkv',
             '-o', str(folder).replace('%', '%%') + os.sep + 'source.%(ext)s', '--', request['url']]
@@ -1770,7 +1770,7 @@ def ensure_services():
             from preview_media import PreviewManager
             PREVIEWS = PreviewManager(DATA / 'previews', preview_command, tool_path('ffmpeg'),
                 error_formatter=lambda text, request: friendly_error(text, request.get('platform')),
-                process_env=process_env, timeout=7200)
+                process_env=process_env, timeout=float('inf'), expiry=float('inf'), max_preview_bytes=float('inf'), max_cache_bytes=float('inf'))
         if UPDATES is None:
             from app_updates import UpdateManager
             UPDATES = UpdateManager(ROOT, VERSION, 'windows' if IS_WINDOWS else 'linux', PORT)
@@ -1916,9 +1916,9 @@ class Handler(BaseHTTPRequestHandler):
         if not self.safe_host() or self.headers.get('X-Keep-Token') != TOKEN or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}'):
             self.close_connection=True
             return self.respond(403, {'error':'Importe o vídeo pela janela do Keep.'})
-        if not 0 < length <= 1024**3:
+        if length <= 0:
             self.close_connection=True
-            raise ValueError('Escolha um vídeo de até 1 GB.')
+            raise ValueError('Escolha um arquivo de vídeo não vazio.')
         if not IMPORT_LOCK.acquire(blocking=False):
             self.close_connection=True
             raise ValueError('Aguarde a importação atual terminar.')
@@ -1930,6 +1930,8 @@ class Handler(BaseHTTPRequestHandler):
                 source=Path(temporary)/'input.media'
                 self.connection.settimeout(30)
                 remaining=length
+                if shutil.disk_usage(temporary).free < length*2:
+                    raise ValueError('Não há espaço livre suficiente para preparar a cópia do vídeo.')
                 with source.open('xb') as output:
                     while remaining:
                         chunk=self.rfile.read(min(1024*1024,remaining))
@@ -1954,7 +1956,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/import':
                 return self.receive_import(length)
             limit = (8 * 1024 * 1024 if self.path == '/api/update/receive' else 2 * MAX_COOKIE_BYTES
-                     if self.path == '/api/cookies/import' else 1024 * 1024 if self.path in ('/api/download', '/api/duplicates')
+                     if self.path == '/api/cookies/import' else 16 * 1024 * 1024 if self.path in ('/api/download', '/api/duplicates')
                      else 64 * 1024 if self.path == '/api/settings/import' else 8192)
             if not 0 < length <= limit:
                 raise ValueError('Tamanho de solicitação inválido.')
@@ -2040,7 +2042,7 @@ class Handler(BaseHTTPRequestHandler):
                 source = PREVIEWS.media_file(preview_id, body.get('key'))
                 preview_info = PREVIEWS.status(preview_id)
                 return self.respond(202, SUBTITLES.create(source, language=body.get('language', 'pt'),
-                    preview_id=preview_id, duration=preview_info.get('duration')))
+                    preview_id=preview_id, duration=preview_info.get('duration'), sections=body.get('sections')))
             if self.path == '/api/subtitles/repair':
                 ensure_services()
                 return self.respond(200, SUBTITLES.repair())

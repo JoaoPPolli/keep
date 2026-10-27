@@ -1,4 +1,4 @@
-KEEP 2.3.0
+KEEP 2.4.0
 Seus vídeos, sempre por perto.
 
 Baixe vídeos do YouTube, X e Twitch, escolha trechos e organize os arquivos
@@ -9,7 +9,7 @@ Site do Keep
 https://joaoppolli.github.io/keep/
 
 Versão atual, downloads e notas da entrega
-https://github.com/JoaoPPolli/keep/releases/tag/v2.3.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.4.0
 
 
 BAIXAR O KEEP
@@ -18,23 +18,23 @@ WINDOWS — PRIMEIRA INSTALAÇÃO
 Pacote portátil completo para Windows 10/11 de 64 bits, Intel/AMD.
 Inclui Python, FFmpeg, Node e o mecanismo de download.
 
-Keep-2.3.0-Windows-Portatil.zip
-https://github.com/JoaoPPolli/keep/releases/download/v2.3.0/Keep-2.3.0-Windows-Portatil.zip
+Keep-2.4.0-Windows-Portatil.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.4.0/Keep-2.4.0-Windows-Portatil.zip
 
 LINUX — PRIMEIRA INSTALAÇÃO
 Pacote para Linux x64 ou ARM64. Requer Python 3.10 ou posterior e FFmpeg.
 A primeira preparação dos demais componentes precisa de internet.
 
-Keep-2.3.0-Linux.tar.gz
-https://github.com/JoaoPPolli/keep/releases/download/v2.3.0/Keep-2.3.0-Linux.tar.gz
+Keep-2.4.0-Linux.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.4.0/Keep-2.4.0-Linux.tar.gz
 
 JÁ TEM O KEEP? BAIXE SOMENTE A ATUALIZAÇÃO DO SEU SISTEMA
 
-Windows — Keep-2.3.0-Windows-Atualizacao.zip
-https://github.com/JoaoPPolli/keep/releases/download/v2.3.0/Keep-2.3.0-Windows-Atualizacao.zip
+Windows — Keep-2.4.0-Windows-Atualizacao.zip
+https://github.com/JoaoPPolli/keep/releases/download/v2.4.0/Keep-2.4.0-Windows-Atualizacao.zip
 
-Linux — Keep-2.3.0-Linux-Atualizacao.tar.gz
-https://github.com/JoaoPPolli/keep/releases/download/v2.3.0/Keep-2.3.0-Linux-Atualizacao.tar.gz
+Linux — Keep-2.4.0-Linux-Atualizacao.tar.gz
+https://github.com/JoaoPPolli/keep/releases/download/v2.4.0/Keep-2.4.0-Linux-Atualizacao.tar.gz
 
 A Release também oferece a instalação leve para Windows. Ela prepara os
 componentes na primeira abertura e exige internet; para começar com todos
@@ -77,7 +77,7 @@ A partir do Keep 2.0.1, Verificar atualização consulta o canal público,
 sem login. O app verifica ao abrir e mostra um aviso quando há uma versão
 nova. Você escolhe baixar o pacote e depois atualizar e reiniciar.
 
-Quem usa o Keep 2.0.0 precisa importar o pacote 2.3.0 uma vez nas
+Quem usa o Keep 2.0.0 precisa importar o pacote 2.4.0 uma vez nas
 Preferências. Depois disso, as verificações usam o canal público.
 
 
@@ -104,27 +104,27 @@ O QUE O KEEP FAZ
 - Preferências portáteis, diagnóstico, relatório de erro sem dados de
   sessão, notificações opcionais e recuperação da versão anterior.
 
-Montagens têm limite de duas horas. Prévias e junções de trechos distantes
+Montagens não têm teto fixo de duração. Prévias e junções de trechos distantes
 podem precisar de mais tempo e espaço temporário. Instagram e transmissões
 ao vivo não estão incluídos.
 
 
 CHANGELOG E GUIAS
 
-Histórico completo das 21 versões, da 1.0 à 2.3.0
+Histórico completo das 22 versões, da 1.0 à 2.4.0
 https://joaoppolli.github.io/keep/changelog.html
 
 Changelog em TXT no próprio GitHub
 https://github.com/JoaoPPolli/keep/blob/main/CHANGELOG.txt
 
 Guia Windows em TXT
-https://github.com/JoaoPPolli/keep/releases/download/v2.3.0/Keep-2.3.0-LEIA-ME-Windows.txt
+https://github.com/JoaoPPolli/keep/releases/download/v2.4.0/Keep-2.4.0-LEIA-ME-Windows.txt
 
 Guia Linux em TXT
-https://github.com/JoaoPPolli/keep/releases/download/v2.3.0/Keep-2.3.0-LEIA-ME-Linux.txt
+https://github.com/JoaoPPolli/keep/releases/download/v2.4.0/Keep-2.4.0-LEIA-ME-Linux.txt
 
 
-SOBRE A VERSÃO 2.3.0
+SOBRE A VERSÃO 2.4.0
 
 - Cheia mantém o recorte vertical em uma só área.
 - Empilhado permite mover e redimensionar a seleção da câmera e a do
@@ -159,12 +159,12 @@ As licenças dos componentes distribuídos estão na pasta licenses/.
 DESENVOLVIMENTO DO APLICATIVO
 
 Os fontes do app estão em app/, recuperados dos pacotes públicos 2.0.0
-com SHA-256 conferido. A versão 2.3.0 mantém câmera empilhada e legendas locais, com prévia completa,
+com SHA-256 conferido. A versão 2.4.0 mantém câmera empilhada e legendas locais, com prévia completa,
 além das atualizações públicas e do modo de enquadramento Cheia.
 Consulte app/README.md para executar, testar e gerar os pacotes.
 
 O manifesto updates.json anuncia somente pacotes já publicados. Para
-migrar do 2.0.0, importe o pacote 2.3.0 uma vez nas Preferências;
+migrar do 2.0.0, importe o pacote 2.4.0 uma vez nas Preferências;
 o app instalado não muda apenas com a publicação do site.
 
 CLIPES DE LIVES
@@ -176,10 +176,16 @@ O botão Abrir Keep do site público não exige login. A configuração antiga
 de abertura automática pelo site privado foi removida.
 
 IMPORTAÇÃO LOCAL E CLIPES DE LIVE
-Use Importar vídeo do PC para abrir arquivos de até 1 GB no editor.
+Use Importar vídeo do PC para abrir arquivos sem limite fixo de tamanho no editor.
 O original permanece intacto. Exporte pelo botão Baixar para salvar a edição.
 Os clipes de live guardam apenas o que o Keep recebeu após clicar em
 Acompanhar live, até os últimos dois minutos. A consulta ao histórico foi removida.
-O modo Circular coloca a câmera em círculo sobre o conteúdo, com tamanho e
+O modo Bola coloca a câmera em círculo sobre o conteúdo, com tamanho e
 posição ajustáveis por controles ou arrastando na prévia.
 Em Legendas, Reparar modelos prepara um novo download oficial.
+
+LEGENDAS POR TRECHO
+As legendas automáticas podem ter uma margem de erro grande. Revise todo
+o texto antes de salvar. Escolha os intervalos e depois gere as legendas:
+o reconhecimento usa só esses trechos. Amplie a seleção e gere novamente
+para incluir falas de outras partes do vídeo.

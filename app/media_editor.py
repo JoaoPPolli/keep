@@ -27,8 +27,6 @@ def normalized_rectangle(value, label):
     return rectangle
 
 
-MAX_CAPTION_CUES = 4000
-MAX_CAPTION_CHARACTERS = 200000
 
 
 def validate_captions(value, duration):
@@ -39,7 +37,7 @@ def validate_captions(value, duration):
     if not value['enabled']:
         return None
     cues = value.get('cues')
-    if not isinstance(cues, list) or not 1 <= len(cues) <= MAX_CAPTION_CUES:
+    if not isinstance(cues, list) or not len(cues):
         raise ValueError('Gere e confira as legendas antes de baixar.')
     result, previous, total = [], 0, 0
     for cue in cues:
@@ -54,8 +52,6 @@ def validate_captions(value, duration):
         if not text:
             raise ValueError('Uma legenda está vazia. Corrija o texto antes de baixar.')
         total += len(text)
-        if total > MAX_CAPTION_CHARACTERS:
-            raise ValueError('Há texto demais nas legendas. Escolha um trecho menor.')
         rounded_start, rounded_end = round(start, 3), round(end, 3)
         if rounded_end <= rounded_start:
             raise ValueError('Uma legenda é curta demais. Aumente seu intervalo para pelo menos 0,001 segundo.')
@@ -156,8 +152,6 @@ def validate_edit(body, duration):
         raise ValueError('Escolha vídeo, áudio ou GIF.')
     if mode == 'gif' and total > 30:
         raise ValueError('Para criar um GIF, escolha no máximo 30 segundos no total.')
-    if total > 7200:
-        raise ValueError('A montagem pode ter no máximo duas horas. Baixe trechos maiores separadamente.')
     vertical = body.get('vertical', False)
     if type(vertical) is not bool or (vertical and mode != 'video'):
         raise ValueError('O enquadramento vertical está disponível para vídeo MP4.')
@@ -169,7 +163,7 @@ def validate_edit(body, duration):
         raise ValueError('O enquadramento precisa ficar dentro da imagem.')
     layout = body.get('layout', 'full')
     if layout not in ('full', 'stacked', 'circle'):
-        raise ValueError('Escolha o modo Cheia, Empilhado ou Circular.')
+        raise ValueError('Escolha o modo Cheia, Empilhado ou Bola.')
     result = {'sections': normalized, 'mode': mode, 'vertical': vertical, 'crop': crop,
               'duration': round(total, 3), 'layout': layout}
     if layout in ('stacked','circle'):

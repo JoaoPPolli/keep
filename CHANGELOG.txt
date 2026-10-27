@@ -1,15 +1,22 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.3.0
+Versão atual: 2.4.0
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.3.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.4.0
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.4.0 — Bola, importação sem teto fixo e legendas por trecho
+
+- Removidos os limites fixos de tamanho da importação e de duração da edição de vídeos; o espaço disponível e os recursos do computador continuam necessários.
+- Circular agora se chama Bola. (Update mais importante da história)
+- Aviso destacado: as legendas automáticas não são perfeitas e podem ter uma margem de erro grande. Revise todo o texto antes de salvar.
+- Ao selecionar trechos, o reconhecimento de fala processa somente esses intervalos, preservando os horários do vídeo original. Ao ampliar a seleção, o app pede novas legendas.
 
 2.3.0 — Câmera circular e ajustes da interface
 

@@ -17,7 +17,7 @@ import zipfile
 
 APP = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(APP))
-from preview_media import (CAPTION_MAX_CUES, SubtitleManager, _CaptionCancelled,
+from preview_media import (SubtitleManager, _CaptionCancelled,
                            _caption_component, caption_cues)
 
 
@@ -39,15 +39,15 @@ class CaptionWordsTests(unittest.TestCase):
         self.assertTrue(all(a['end'] <= b['start'] for a,b in zip(cues,cues[1:])))
 
     def test_rejects_invalid_or_unbounded_asr_timestamps(self):
-        for start,end in [(float('nan'),1), (0,float('inf')),(-1,1),(1,0),(False,1),(0,8000)]:
+        for start,end in [(float('nan'),1), (0,float('inf')),(-1,1),(1,0),(False,1)]:
             with self.subTest(start=start,end=end), self.assertRaises(ValueError):
                 caption_cues([{'start':start,'end':end,'word':'teste'}])
         with self.assertRaises(ValueError):
             caption_cues([{'start':2,'end':3,'word':'primeiro'}, {'start':0,'end':1,'word':'fora da ordem'}])
 
-    def test_rejects_too_many_cues(self):
-        words=[{'start':float(i),'end':i+.1,'word':'voz'} for i in range(CAPTION_MAX_CUES+1)]
-        with self.assertRaises(ValueError):caption_cues(words)
+    def test_accepts_more_than_the_old_cue_limit(self):
+        words=[{'start':float(i),'end':i+.1,'word':'voz'} for i in range(4001)]
+        self.assertTrue(caption_cues(words))
 
 
 class CaptionComponentTests(unittest.TestCase):
@@ -153,6 +153,32 @@ class CaptionLifecycleTests(unittest.TestCase):
         self.assertFalse(list(self.manager.cache.iterdir()))
         self.assertTrue(self.source.exists())
 
+    def test_only_selected_audio_is_decoded_with_source_timestamps(self):
+        observed=[]
+        class StubRecognizer:
+            def transcribe(self,path,cancelled,progress):
+                with wave.open(str(path),'rb') as audio:observed.append(audio.getnframes())
+                return [{'start':.01,'end':.15,'text':'Fala selecionada'}]
+        with patch.object(self.manager,'_prepare',return_value=StubRecognizer()):
+            task=self.manager.create(self.source,duration=8000,sections=[{'start':.2,'end':.4},{'start':.7,'end':.9}])
+            result=self.wait(task['id'])
+        self.assertEqual(result['status'],'ready',result)
+        self.assertEqual(observed,[3200,3200])
+        self.assertEqual([(cue['start'],cue['end']) for cue in result['cues']],[(.21,.35),(.71,.85)])
+
+    def test_overlapping_selected_ranges_are_recognized_once(self):
+        observed=[]
+        class StubRecognizer:
+            def transcribe(self,path,cancelled,progress):
+                with wave.open(str(path),'rb') as audio:observed.append(audio.getnframes())
+                return [{'start':0,'end':.5,'text':'Trechos sobrepostos'}]
+        with patch.object(self.manager,'_prepare',return_value=StubRecognizer()):
+            task=self.manager.create(self.source,duration=1,sections=[{'start':.1,'end':.5},{'start':.3,'end':.7}])
+            result=self.wait(task['id'])
+        self.assertEqual(result['status'],'ready',result)
+        self.assertEqual(observed,[9600])
+        self.assertEqual(result['cues'][0]['start'],.1)
+
     def test_queued_task_can_be_cancelled_and_no_source_is_deleted(self):
         started=threading.Event();release=threading.Event()
         def preparing(task):
@@ -167,9 +193,9 @@ class CaptionLifecycleTests(unittest.TestCase):
             self.assertEqual(self.wait(two['id'])['status'],'cancelled')
         self.assertTrue(self.source.exists())
 
-    def test_rejects_unknown_language_source_links_and_excess_duration(self):
+    def test_rejects_unknown_language_source_links_and_invalid_duration(self):
         with self.assertRaises(ValueError):self.manager.create(self.source,'xx')
-        with self.assertRaises(ValueError):self.manager.create(self.source,'pt',duration=8000)
+        with self.assertRaises(ValueError):self.manager.create(self.source,'pt',duration=float('inf'))
         linked=self.root/'linked.wav';linked.symlink_to(self.source)
         with self.assertRaises(ValueError):self.manager.create(linked)
 

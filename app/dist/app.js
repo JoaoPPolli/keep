@@ -15,6 +15,7 @@ let editSections=[],previewFPS=null,previewDimensions=null,previewFrameTimes=nul
 let retryEditor=null,retryDownloadOptions=null;
 let cropFrameCallback=null,cropAnimationFrame=null;
 let editorLayout='full',editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};
+let captionSections=null;
 let captionTask='',captionState='idle',captionCues=[],captionBinding='',captionTimer,captionGeneration=0,pendingCaptionCues=null;
 let desktopStatus=null,desktopWorking=false,restorePoints=[],restoringPoint=false;
 const icons = {YouTube:'yt', X:'x', Twitch:'twitch',Local:'folder'};
@@ -107,8 +108,6 @@ function plannedSections() {
  for(const section of sections){if(!Number.isFinite(section.start)||!Number.isFinite(section.end)||section.start<0||section.end-section.start<.0999||section.end>Number(current?.duration)+.001)throw new Error('Escolha trechos de pelo menos 0,1 segundo dentro da duração do vídeo.');}
  const total=sections.reduce((sum,item)=>sum+item.end-item.start,0);
  if($('format').value==='gif'&&total>30.001)throw new Error('Para criar GIF, selecione no máximo 30 segundos no total.');
- if($('section-output').value==='join'&&total>7200.001)throw new Error('A montagem pode ter no máximo duas horas. Baixe os trechos separadamente.');
- if($('section-output').value==='separate'&&sections.some(item=>item.end-item.start>7200.001))throw new Error('Cada trecho editado pode ter no máximo duas horas.');
  return sections;
 }
 function configureSection(section) {
@@ -212,7 +211,7 @@ function updateVertical() {
  $('vertical-enabled').disabled=!video||(native&&editorLayout==='full')||!single||!dimensions;
  $('vertical-layout-options').hidden=!video||!single||!dimensions;
  for(const layout of ['full','stacked','circle']){const button=$('vertical-layout-'+layout);button.classList.toggle('active',editorLayout===layout);button.setAttribute('aria-pressed',String(editorLayout===layout));}
- $('vertical-note').textContent=!video?'O enquadramento vertical está disponível para vídeo MP4.':native&&editorLayout==='full'?'Este vídeo já está em 9:16. O modo Cheia mantém seu enquadramento; você também pode escolher Empilhado.':!dimensions?'A plataforma não informou as dimensões. Prepare a prévia para conferir o enquadramento.':editorLayout==='circle'?'Selecione a câmera e o conteúdo. Ajuste o tamanho e a posição da câmera circular no resultado.':editorLayout==='stacked'?'Escolha a área da câmera e a do conteúdo no vídeo original. O resultado coloca a câmera acima do conteúdo.':'Ative para escolher uma área vertical da imagem. O restante da imagem será cortado.';
+ $('vertical-note').textContent=!video?'O enquadramento vertical está disponível para vídeo MP4.':native&&editorLayout==='full'?'Este vídeo já está em 9:16. O modo Cheia mantém seu enquadramento; você também pode escolher Empilhado.':!dimensions?'A plataforma não informou as dimensões. Prepare a prévia para conferir o enquadramento.':editorLayout==='circle'?'Selecione a câmera e o conteúdo. Ajuste o tamanho e a posição da câmera em Bola no resultado.':editorLayout==='stacked'?'Escolha a área da câmera e a do conteúdo no vídeo original. O resultado coloca a câmera acima do conteúdo.':'Ative para escolher uma área vertical da imagem. O restante da imagem será cortado.';
  const enabled=verticalEnabled(),stacked=enabled&&editorLayout!=='full';
  $('vertical-preview').style.touchAction=editorLayout==='circle'?'none':'';
  $('circle-controls').hidden=editorLayout!=='circle';$('stack-height-controls').hidden=editorLayout==='circle';
@@ -229,7 +228,7 @@ function updateVertical() {
  $('crop-source-label').hidden=!output;$('crop-source-label').textContent=stacked?'Original · câmera rosa e conteúdo azul':enabled?'Original · arraste a borda verde':'Original · sem legendas';
  $('vertical-output').hidden=!output;$('stack-divider').hidden=!enabled||editorLayout!=='stacked';
  $('stack-divider').style.top=String(Number($('camera-height').value))+'%';
- $('output-preview-heading').textContent=enabled?'Resultado · 9:16'+(editorLayout==='circle'?' · câmera circular':stacked?' empilhado':''):'Resultado · com legendas';
+ $('output-preview-heading').textContent=enabled?'Resultado · 9:16'+(editorLayout==='circle'?' · câmera em Bola':stacked?' empilhado':''):'Resultado · com legendas';
  renderCaptionState();updateCropOverlay();drawVerticalPreview();scheduleVerticalPreview();
 }
 function cropPixels(width,height,x,y) {
@@ -390,20 +389,20 @@ for(const event of ['loadeddata','seeked','timeupdate','pause','ended'])$('previ
 $('preview-player').addEventListener('play',()=>scheduleVerticalPreview());
 for(const event of ['emptied','error'])$('preview-player').addEventListener(event,clearVerticalPreview);
 function validCaptionCues(cues,duration=Number(current?.duration)) {
- if(!Array.isArray(cues)||cues.length>4000||!Number.isFinite(duration)||duration<=0)throw new Error('A lista de legendas está inválida. Gere novamente.');
+ if(!Array.isArray(cues)||!Number.isFinite(duration)||duration<=0)throw new Error('A lista de legendas está inválida. Gere novamente.');
  let end=0,total=0;return cues.map(item=>{
   const start=item?.start,next=item?.end,text=typeof item?.text==='string'?item.text.trim():'';total+=Array.from(text).length;
-  if(typeof start!=='number'||typeof next!=='number'||!Number.isFinite(start)||!Number.isFinite(next)||start<end-.001||start<0||next<=start||next>duration+.01||!text||Array.from(text).length>180||total>200000)throw new Error('Confira o texto e os horários das legendas antes de baixar.');
+  if(typeof start!=='number'||typeof next!=='number'||!Number.isFinite(start)||!Number.isFinite(next)||start<end-.001||start<0||next<=start||next>duration+.01||!text||Array.from(text).length>180)throw new Error('Confira o texto e os horários das legendas antes de baixar.');
   if(Math.round(next*1000)<=Math.round(start*1000))throw new Error('Uma legenda ficou curta demais. Gere novamente para conferir os horários.');
   end=next;return{start,end:next,text};
  });
 }
 function normalizeGeneratedCaptionCues(cues,duration=Number(current?.duration)) {
- if(!Array.isArray(cues)||cues.length>4000||!Number.isFinite(duration)||duration<=0)throw new Error('A lista de legendas está inválida. Gere novamente.');
+ if(!Array.isArray(cues)||!Number.isFinite(duration)||duration<=0)throw new Error('A lista de legendas está inválida. Gere novamente.');
  let previous=0,total=0,clamped=0,removed=0;const normalized=[];
  for(const item of cues){
   const start=item?.start,end=item?.end,text=typeof item?.text==='string'?item.text.trim():'';total+=Array.from(text).length;
-  if(typeof start!=='number'||typeof end!=='number'||!Number.isFinite(start)||!Number.isFinite(end)||start<previous-.001||start<0||end<=start||!text||Array.from(text).length>180||total>200000)throw new Error('Confira o texto e os horários das legendas antes de baixar.');
+  if(typeof start!=='number'||typeof end!=='number'||!Number.isFinite(start)||!Number.isFinite(end)||start<previous-.001||start<0||end<=start||!text||Array.from(text).length>180)throw new Error('Confira o texto e os horários das legendas antes de baixar.');
   previous=end;
   if(start>=duration){removed++;continue;}
   if(end>duration+.25)throw new Error('Os horários das legendas não correspondem à duração do vídeo. Prepare a prévia e gere novamente.');
@@ -417,6 +416,7 @@ function captionExportReady() {
  if(!captionsEnabled())return true;
  if(captionState!=='ready'||captionBinding!==previewId)throw new Error('Gere e confira as legendas desta prévia antes de baixar.');
  if(!captionCues.length)throw new Error('Nenhuma fala foi identificada. Gere novamente ou desative as legendas para baixar.');
+ if(captionSections){const selected=plannedSections()||[{start:0,end:current.duration}];if(selected.some(part=>!captionSections.some(known=>part.start>=known.start-.01&&part.end<=known.end+.01)))throw new Error('A seleção mudou. Gere as legendas dos novos trechos antes de baixar.');}
  validCaptionCues(captionCues);return true;
 }
 function captionBusy() {return ['queued','preparing','transcribing'].includes(captionState);}
@@ -425,11 +425,11 @@ function renderCaptionState() {
  const allowed=$('format').value==='video'&&selectedItems().length===1&&Number(current?.duration)>0;
  $('captions-enabled').disabled=!allowed;$('captions-controls').hidden=!$('captions-enabled').checked;
  $('generate-captions').disabled=!allowed||!ready||busy||!token||keepClosed;
- $('generate-captions').textContent=captionState==='ready'?'Gerar novamente':'Gerar legendas da prévia';$('cancel-captions').hidden=!busy;$('captions-progress').hidden=!busy;
+ $('generate-captions').textContent=$('download-scope').value==='section'?'Gerar legendas dos trechos':'Gerar legendas do vídeo inteiro';$('cancel-captions').hidden=!busy;$('captions-progress').hidden=!busy;
  if(captionState==='idle')$('captions-status').textContent=ready?'Clique em Gerar legendas para reconhecer a fala e conferir o resultado na prévia.':'Prepare uma prévia para gerar as legendas.';
 }
 function resetCaptionState(cancel=true) {
- const previous=captionTask;captionTask='';captionGeneration++;clearTimeout(captionTimer);captionState='idle';captionCues=[];captionBinding='';$('captions-review').hidden=true;$('captions-list').replaceChildren();$('captions-status').classList.remove('invalid');
+ captionSections=null;const previous=captionTask;captionTask='';captionGeneration++;clearTimeout(captionTimer);captionState='idle';captionCues=[];captionBinding='';$('captions-review').hidden=true;$('captions-list').replaceChildren();$('captions-status').classList.remove('invalid');
  if(cancel&&previous&&token)api('subtitles/cancel',{id:previous}).catch(()=>{});
  renderCaptionState();
 }
@@ -463,7 +463,7 @@ $('captions-language').addEventListener('change',()=>{resetCaptionState();update
 $('generate-captions').addEventListener('click',async()=>{
  if(!previewId||!token||captionBusy())return;
  resetCaptionState();const generation=captionGeneration,binding=previewId;captionState='preparing';$('captions-status').textContent='Preparando o reconhecimento de fala…';renderCaptionState();updateSection();
- try{const key=new URL($('preview-player').src,location.href).searchParams.get('key');acceptCaptionTask(await api('subtitles',{preview_id:binding,key,language:$('captions-language').value}),binding,generation);}catch(error){captionFailure(error,generation);}
+ try{const sections=plannedSections();captionSections=sections?sections.map(part=>({...part})).sort((a,b)=>a.start-b.start).reduce((known,part)=>{if(known.length&&part.start<=known[known.length-1].end)known[known.length-1].end=Math.max(known[known.length-1].end,part.end);else known.push(part);return known;},[]):null;const key=new URL($('preview-player').src,location.href).searchParams.get('key');acceptCaptionTask(await api('subtitles',{preview_id:binding,key,language:$('captions-language').value,sections}),binding,generation);}catch(error){captionFailure(error,generation);}
 });
 $('cancel-captions').addEventListener('click',async()=>{
  const id=captionTask;resetCaptionState(false);captionState='cancelled';$('captions-status').textContent='Geração cancelada. Você pode gerar novamente ou desativar as legendas.';renderCaptionState();updateSection();if(id&&token)try{await api('subtitles/cancel',{id});}catch(error){$('captions-status').textContent=error.message;}
@@ -700,7 +700,7 @@ $('prepare-preview').addEventListener('click',async()=>{
 });
 $('cancel-preview').addEventListener('click',()=>{resetPreview();$('preview-status').textContent='Prévia descartada. Os horários escolhidos foram mantidos.';});
 $('preview-player').addEventListener('loadedmetadata',()=>{
-  if(pendingCaptionCues&&previewId){captionCues=pendingCaptionCues;pendingCaptionCues=null;captionBinding=previewId;captionState='ready';renderCaptionReview();$('captions-status').textContent='Legendas da edição anterior recuperadas. Confira o texto na nova prévia.';}
+  if(pendingCaptionCues&&previewId){captionCues=pendingCaptionCues;pendingCaptionCues=null;captionSections=editSections.length?editSections.map(part=>({...part})):null;captionBinding=previewId;captionState='ready';renderCaptionReview();$('captions-status').textContent='Legendas da edição anterior recuperadas. Confira o texto na nova prévia.';}
   ['mark-start','mark-end'].forEach(id=>$(id).disabled=false);updateSection();
   $('preview-clock').textContent=timeLabel($('preview-player').currentTime)+' / '+timeLabel($('preview-player').duration||current?.duration||0);
   updateVertical();updateFrameInfo();updateTimelineClock();
@@ -762,7 +762,6 @@ function buildDownloadRequests(automatic=false) {
  if(captions)captionExportReady();
  if(!sections&&(vertical||captions)){
   if(selected.length!==1||!Number.isFinite(current?.duration)||current.duration<=0)throw new Error('Selecione um vídeo com duração informada para editar.');
-  if(current.duration>7200)throw new Error('Selecione trechos de até duas horas para editar ou legendar.');
   sections=[{start:0,end:current.duration}];
  }
  if(!sections)return selected.map(base);
@@ -923,7 +922,7 @@ function renderJobs(){
  const active=jobs.filter(job=>job.status==='downloading').length,queued=jobs.filter(job=>job.status==='queued').length,paused=jobs.filter(job=>job.status==='paused').length;
  $('queue-summary').textContent=[active?`${active} em andamento`:null,queued?`${queued} na fila`:null,paused?`${paused} pausado${paused===1?'':'s'}`:null].filter(Boolean).join(' · ')||'Até dois downloads ao mesmo tempo. Os próximos começam automaticamente.';
 }
-async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.3.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
+async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.4.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
 async function refreshStorage(force=false) {
  if(!local||!token||keepClosed||(!force&&Date.now()-storageCheckedAt<12000))return;
  storageCheckedAt=Date.now();
@@ -1121,7 +1120,7 @@ function renderUpdate(data) {
   $('download-update').hidden=!data.can_download||rollback;
   $('download-update').disabled=busy||!local||!token;
   $('download-update').textContent=state==='failed'?'Tentar baixar novamente':'Baixar atualização';
-  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.3.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
+  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.4.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
   const labels={idle:'Verifique se há uma nova versão disponível.',checking:'Verificando a versão na página de atualizações…',available:'Uma nova versão está disponível.',current:'Você está usando a versão mais recente.',downloading:'Recebendo e verificando a atualização…',ready:'Atualização verificada. Clique em Atualizar e reiniciar para instalar.',applying:'Atualizando e reiniciando o Keep. Aguarde nesta página…',failed:'Não foi possível verificar a atualização.'};
   $('update-status').textContent=data.error||(rollback&&state==='applying'?'Restaurando a versão anterior e reiniciando o Keep. Aguarde nesta página…':data.message)||(rollback&&state==='ready'?'Cópia anterior conferida. Clique em Restaurar e reiniciar para concluir.':labels[state]||labels.idle);
   $('update-status').classList.toggle('invalid',state==='failed'||!!data.error);
@@ -1265,7 +1264,6 @@ $('local-video').addEventListener('change',async()=>{
  const file=$('local-video').files[0];if(!file)return;
  if(!local||!token){$('import-status').textContent='Abra o Keep no computador para importar vídeos.';return;}
  if(searching||startingDownload||batchRunning)return;
- if(file.size>1024**3){$('import-status').textContent='Escolha um vídeo de até 1 GB.';return;}
  invalidateVideo();const generation=previewGeneration;searching=true;$('inspect').disabled=true;$('local-video').disabled=true;
  $('import-status').textContent='Importando e preparando a prévia… O original permanece na sua pasta.';
  try{

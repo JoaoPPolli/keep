@@ -14,7 +14,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent
 TOOLS = ROOT / 'tools'
 LICENSES = ROOT / 'licenses'
-VERSION = '2.3.0'
+VERSION = '2.4.0'
 ENGINE = {
     'url': 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.10.10.233141/yt-dlp',
     'sha256': 'f40b6a9e4c5786360953911cab5d2f87507626b8fb7bfee3f8f1c2e5cf341fae',

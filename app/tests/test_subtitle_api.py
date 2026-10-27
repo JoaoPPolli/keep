@@ -110,7 +110,7 @@ class SubtitleAPITests(unittest.TestCase):
         self.assertEqual(result['status'], 'queued')
         source, options = self.recognizer.calls[0]
         self.assertEqual(source, self.source)
-        self.assertEqual(options, {'language': 'pt', 'preview_id': self.id, 'duration': 2})
+        self.assertEqual(options, {'language': 'pt', 'preview_id': self.id, 'duration': 2, 'sections': None})
 
     def test_wrong_capability_or_arbitrary_path_cannot_reach_the_recognizer(self):
         for body in [{'preview_id': self.id, 'key': 'wrong'}, {'source': '/etc/passwd'}]:
