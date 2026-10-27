@@ -19,7 +19,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows-captions:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recognize real speech with the production DLL and Unicode model path
+        run: python scripts/check_windows_captions.py
+
   publish:
+    needs: windows-captions
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:

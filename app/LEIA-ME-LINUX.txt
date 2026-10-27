@@ -1,4 +1,4 @@
-KEEP 2.1.1 — GUIA EM PORTUGUÊS BRASILEIRO
+KEEP 2.2.0 — GUIA EM PORTUGUÊS BRASILEIRO
 LINUX — X64 OU ARM64
 
 Esta versão traz câmera empilhada e legendas locais com prévia, além do modo Cheia.
@@ -145,7 +145,7 @@ Verificar atualização refaz a consulta. Clique em Baixar atualização para
 receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
 A consulta não baixa nem instala o pacote automaticamente.
 
-Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.1.1 do seu sistema
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.2.0 do seu sistema
 nas Preferências. Versões anteriores sem importação podem usar o atualizador
 manual com o Keep fechado. O pacote deve vir da release pública oficial em
 https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências
@@ -187,3 +187,27 @@ legendas em exportações reais com FFmpeg, áudio preservado, integridade dos
 pacotes e atualização manual em instalações isoladas. Reconhecimento de fala
 é validado com modelos locais. Não houve execução nativa Windows nesta etapa.
 Integrações de menu e notificações dependem da sessão gráfica do computador.
+
+IMPORTAR VÍDEOS DO PC
+Clique em Importar vídeo do PC e selecione um arquivo de até 1 GB.
+O vídeo abre na prévia para cortar, compor a câmera e gerar legendas.
+Clique em Baixar para salvar uma nova versão; o original fica intacto.
+A prévia pode ter qualidade menor, mas a edição usa o original importado.
+
+HISTÓRICO DE UMA LIVE
+Use Consultar histórico da live. Quando uma gravação em andamento é
+identificada, ela abre no editor normal. Caso contrário, o Keep consulta
+a janela HLS acessível. Os horários dessa janela começam em zero, e podem
+não corresponder ao começo da transmissão. Escolha até dez minutos por
+trecho HLS e prepare a prévia. Consulte novamente para obter novos momentos.
+Se a plataforma não fornecer o passado ou os segmentos expirarem, o Keep
+informa a falha. O acompanhamento e os clipes recentes continuam disponíveis.
+
+LEGENDAS NO WINDOWS
+O Keep prepara um caminho compatível para o modelo quando há acentos na
+pasta da instalação. Se os modelos falharem, use Reparar modelos de legendas
+e depois Gerar legendas para baixar novamente o idioma oficial verificado.
+
+CORTES DO YOUTUBE
+Se o corte remoto falhar, o Keep tenta baixar a origem e cortar localmente.
+Isso pode usar mais tempo e espaço temporário, principalmente em vídeos longos.

@@ -17,7 +17,7 @@ let cropFrameCallback=null,cropAnimationFrame=null;
 let editorLayout='full',editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};
 let captionTask='',captionState='idle',captionCues=[],captionBinding='',captionTimer,captionGeneration=0,pendingCaptionCues=null;
 let desktopStatus=null,desktopWorking=false,restorePoints=[],restoringPoint=false;
-const icons = {YouTube:'yt', X:'x', Twitch:'twitch'};
+const icons = {YouTube:'yt', X:'x', Twitch:'twitch',Local:'folder'};
 const icon = name => `<svg aria-hidden="true"><use href="#${name}"/></svg>`;
 const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let defaultQuality = '1080';
@@ -71,7 +71,7 @@ function updateSection() {
   for(const id of ['mark-start','mark-end','play-section'])$(id).hidden=!partial;
   $('timeline').hidden=!partial;
   $('quality').disabled = audio||gif||!!current?.clip;
-  if(current?.clip)$('quality-note').textContent='Este clipe usa a qualidade capturada, até 720p. O original já está em Meus downloads.';
+  if(current?.clip)$('quality-note').textContent='O download usa a cópia preparada nesta prévia. Clique em Baixar para salvar sua versão.';
   $('scope-full').disabled=gif;
   $('custom-name-hint').textContent='Digite o nome sem extensão. O Keep adiciona '+(gif?'GIF':audio?'MP3':'MP4')+'. Cada download continua em sua própria pasta.';
   $('section-output-note').hidden=!partial||$('section-output').value!=='join'||editSections.length<2;
@@ -489,7 +489,7 @@ function selectedItems() {
 }
 function videoRequest(item = current) {
   return {url:inspection?.url || item?.url || $('video-url').value.trim(), browser:$('browser-session').value,
-    ...(item?.video_index !== undefined ? {video_index:item.video_index} : {}),
+    ...(item?.local_file?{local_file:true}:{}),...(item?.video_index !== undefined ? {video_index:item.video_index} : {}),
     ...(item?.video_id ? {video_id:item.video_id} : {}),
     ...(inspection?.inspection_id ? {inspection_id:inspection.inspection_id} : {}),...(item?.clip?{clip:{...item.clip}}:{})};
 }
@@ -528,11 +528,51 @@ $('select-all-videos').addEventListener('click',()=>{
   resetPreview();resetEditor();configureSection(null);renderPostVideos();updateSection();
 });
 let liveCandidate=null,liveId='',liveState=null,liveTimer,liveBusy=false,liveClipping=false;
+let liveGeneration=0,historyId='';
+function detachLive(){
+ liveGeneration++;const id=liveId;liveId='';liveCandidate=null;liveState=null;historyId='';liveBusy=false;
+ clearTimeout(liveTimer);$('live-panel').hidden=true;$('live-history-fields').hidden=true;
+ if(id&&token)api('live/stop',{id}).catch(()=>{});
+}
+$('live-history').addEventListener('click',async()=>{
+ if(!liveCandidate)return;const generation=liveGeneration;
+ $('live-history').disabled=true;$('live-history-status').textContent='Consultando o histórico que a plataforma disponibiliza…';
+ try{
+  const data=await api('live/history',{url:liveCandidate.url,browser:$('browser-session').value});
+  if(generation!==liveGeneration)return;
+  $('live-history-status').textContent=data.note;
+  if(data.video){
+   inspection=data.video;currentItems=data.video.items||[data.video];selectedVideos=new Set([String(currentItems[0].video_index||1)]);
+   showCurrentVideo(currentItems[0]);renderPostVideos();$('video-result').hidden=false;
+   $('download-scope').value='section';updateSection();
+  }else{
+   historyId=data.id;$('live-history-fields').hidden=false;
+   $('live-history-start').value='0:00';$('live-history-end').value=timeLabel(Math.min(30,data.duration));
+   $('live-history-status').textContent=`Histórico disponível: ${timeLabel(data.duration)}. `+data.note;
+  }
+ }catch(error){if(generation===liveGeneration)$('live-history-status').textContent=error.message;}
+ finally{if(generation===liveGeneration)$('live-history').disabled=false;}
+});
+$('live-history-preview').addEventListener('click',async()=>{
+ if(!historyId)return;const generation=liveGeneration,previewVersion=previewGeneration;
+ $('live-history-preview').disabled=true;
+ try{
+  const start=parseTime($('live-history-start').value),end=parseTime($('live-history-end').value);
+  const data=await api('live/history/clip',{id:historyId,section:{start,end}});
+  if(generation!==liveGeneration||previewVersion!==previewGeneration){api('preview/cancel',{id:data.preview.id}).catch(()=>{});return;}
+  inspection=null;currentItems=[{...data.video,clip:{id:data.preview.id}}];selectedVideos=new Set(['1']);
+  showCurrentVideo(currentItems[0]);renderPostVideos();$('video-result').hidden=false;
+  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=true;$('cancel-preview').hidden=true;
+  message('Preparando o trecho histórico. Confira na prévia, ajuste a câmera ou as legendas e clique em Baixar para salvar.');
+ }catch(error){if(generation===liveGeneration)$('live-history-status').textContent=error.message;}
+ finally{if(generation===liveGeneration)$('live-history-preview').disabled=false;}
+});
+
 function showLiveCandidate(data){
  if(liveId&&['connecting','buffering'].includes(liveState?.status)){
   message('O Keep já acompanha uma live. Pare o acompanhamento antes de escolher outra.',true);return false;
  }
- liveCandidate=data;$('live-panel').hidden=false;$('live-title').textContent='Ao vivo · '+data.title;
+ liveCandidate=data;$('live-history').disabled=false;$('live-history-preview').disabled=false;$('live-history-status').textContent='Consulte o histórico para escolher um momento anterior, quando disponível.';$('live-panel').hidden=false;$('live-title').textContent='Ao vivo · '+data.title;
  renderLive(liveState);return true;
 }
 function renderLive(data){
@@ -554,17 +594,18 @@ function pollLive(){
 }
 $('live-start').addEventListener('click',async()=>{
  if(!liveCandidate||liveBusy)return;
- liveBusy=true;renderLive(liveState);$('live-status').textContent='Conferindo a transmissão e iniciando o acompanhamento…';
- try{const data=await api('live/start',{url:liveCandidate.url,browser:$('browser-session').value});liveId=data.id;renderLive(data);pollLive();}
- catch(error){$('live-status').textContent=error.message;$('live-status').classList.add('invalid');}
- finally{liveBusy=false;$('live-start').disabled=false;$('live-stop').disabled=false;}
+ const generation=liveGeneration;liveBusy=true;renderLive(liveState);$('live-status').textContent='Conferindo a transmissão e iniciando o acompanhamento…';
+ try{const data=await api('live/start',{url:liveCandidate.url,browser:$('browser-session').value});if(generation!==liveGeneration){api('live/stop',{id:data.id}).catch(()=>{});return;}liveId=data.id;renderLive(data);pollLive();}
+ catch(error){if(generation===liveGeneration){$('live-status').textContent=error.message;$('live-status').classList.add('invalid');}}
+ finally{if(generation===liveGeneration){liveBusy=false;$('live-start').disabled=false;$('live-stop').disabled=false;}}
 });
 $('live-stop').addEventListener('click',async()=>{
  if(!liveId||liveBusy)return;
+ const generation=liveGeneration,id=liveId;
  liveBusy=true;clearTimeout(liveTimer);renderLive(liveState);
- try{renderLive(await api('live/stop',{id:liveId}));}
- catch(error){$('live-status').textContent=error.message;pollLive();}
- finally{liveBusy=false;renderLive(liveState);}
+ try{const data=await api('live/stop',{id});if(generation===liveGeneration)renderLive(data);}
+ catch(error){if(generation===liveGeneration){$('live-status').textContent=error.message;pollLive();}}
+ finally{if(generation===liveGeneration){liveBusy=false;renderLive(liveState);}}
 });
 $('live-clip').addEventListener('click',async()=>{
  if(!liveId||liveClipping||liveBusy)return;
@@ -615,7 +656,7 @@ async function inspectVideo(automatic = false) {
     }
   }catch(error){message(error.message,true);}finally{searching=false;$('cookie-file').disabled=false;$('remove-cookies').disabled=false;$('inspect').disabled=false;$('paste-download').disabled=false;$('inspect').innerHTML='Buscar vídeo'+icon('arrow');}
 }
-function invalidateVideo(){resetPreview();resetEditor();current=null;inspection=null;currentItems=[];selectedVideos.clear();$('custom-name').value='';$('video-result').hidden=true;}
+function invalidateVideo(){detachLive();resetPreview();resetEditor();current=null;inspection=null;currentItems=[];selectedVideos.clear();$('custom-name').value='';$('video-result').hidden=true;}
 function resetPreview() {
   resetCaptionState();
   const previous=previewId;previewId='';previewGeneration++;clearTimeout(previewTimer);previewPlayingSection=false;
@@ -896,7 +937,7 @@ function renderJobs(){
  const active=jobs.filter(job=>job.status==='downloading').length,queued=jobs.filter(job=>job.status==='queued').length,paused=jobs.filter(job=>job.status==='paused').length;
  $('queue-summary').textContent=[active?`${active} em andamento`:null,queued?`${queued} na fila`:null,paused?`${paused} pausado${paused===1?'':'s'}`:null].filter(Boolean).join(' · ')||'Até dois downloads ao mesmo tempo. Os próximos começam automaticamente.';
 }
-async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.1.1')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
+async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.2.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
 async function refreshStorage(force=false) {
  if(!local||!token||keepClosed||(!force&&Date.now()-storageCheckedAt<12000))return;
  storageCheckedAt=Date.now();
@@ -1094,7 +1135,7 @@ function renderUpdate(data) {
   $('download-update').hidden=!data.can_download||rollback;
   $('download-update').disabled=busy||!local||!token;
   $('download-update').textContent=state==='failed'?'Tentar baixar novamente':'Baixar atualização';
-  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.1.1')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
+  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.2.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
   const labels={idle:'Verifique se há uma nova versão disponível.',checking:'Verificando a versão na página de atualizações…',available:'Uma nova versão está disponível.',current:'Você está usando a versão mais recente.',downloading:'Recebendo e verificando a atualização…',ready:'Atualização verificada. Clique em Atualizar e reiniciar para instalar.',applying:'Atualizando e reiniciando o Keep. Aguarde nesta página…',failed:'Não foi possível verificar a atualização.'};
   $('update-status').textContent=data.error||(rollback&&state==='applying'?'Restaurando a versão anterior e reiniciando o Keep. Aguarde nesta página…':data.message)||(rollback&&state==='ready'?'Cópia anterior conferida. Clique em Restaurar e reiniciar para concluir.':labels[state]||labels.idle);
   $('update-status').classList.toggle('invalid',state==='failed'||!!data.error);
@@ -1222,3 +1263,28 @@ async function init(){
  }catch{$('connection').innerHTML='<span></span>Mecanismo indisponível';message('Inicie o Keep pelo iniciador do seu sistema e depois atualize esta página.',true);}
 }
 init();
+
+$('repair-captions').addEventListener('click',async()=>{
+ $('repair-captions').disabled=true;
+ try{const data=await api('subtitles/repair',{});$('captions-status').textContent=data.message;}
+ catch(error){$('captions-status').textContent=error.message;}
+ finally{$('repair-captions').disabled=false;}
+});
+$('local-video').addEventListener('change',async()=>{
+ const file=$('local-video').files[0];if(!file)return;
+ if(!local||!token){$('import-status').textContent='Abra o Keep no computador para importar vídeos.';return;}
+ if(searching||startingDownload||batchRunning)return;
+ if(file.size>1024**3){$('import-status').textContent='Escolha um vídeo de até 1 GB.';return;}
+ invalidateVideo();const generation=previewGeneration;searching=true;$('inspect').disabled=true;$('local-video').disabled=true;
+ $('import-status').textContent='Importando e preparando a prévia… O original permanece na sua pasta.';
+ try{
+  const response=await fetch('/api/import',{method:'POST',headers:{'X-Keep-Token':token,'X-Keep-Filename':encodeURIComponent(file.name),'Content-Type':'application/octet-stream'},body:file});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||'Não foi possível importar este vídeo.');
+  if(generation!==previewGeneration){api('preview/cancel',{id:data.preview.id}).catch(()=>{});return;}
+  $('video-url').value='';inspection=null;currentItems=[{...data.video,clip:{id:data.preview.id}}];selectedVideos=new Set(['1']);
+  showCurrentVideo(currentItems[0]);renderPostVideos();$('video-result').hidden=false;
+  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=true;$('cancel-preview').hidden=true;
+  $('import-status').textContent='Vídeo importado. Use a prévia e clique em Baixar para salvar uma versão editada.';
+ }catch(error){$('import-status').textContent=error.message;}
+ finally{searching=false;$('inspect').disabled=false;$('local-video').disabled=false;$('local-video').value='';}
+});

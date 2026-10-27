@@ -48,6 +48,7 @@ NOTES = {
     '2.1.1': [
         'O changelog do app agora mostra apenas as novidades da versão instalada, sem acumular atualizações anteriores.',
     ],
+    '2.2.0': ['Legendas: modelo oficial de inglês, preparação de caminhos compatíveis no Windows e opção para reparar os modelos.', 'Correção do painel de live que permanecia ao trocar para um vídeo normal; o acompanhamento anterior é encerrado.', 'Cortes do YouTube: alternativa de baixar a origem e montar os trechos localmente quando o corte remoto falhar.', 'Importação de vídeos do PC para cortar, compor a câmera e legendar, preservando o arquivo original.', 'Consulta ao histórico disponível da live: gravação em andamento quando identificada ou janela HLS acessível, com escolha de horários.'],
 }
 
 

@@ -120,6 +120,7 @@ class _Preview:
     frame_times: list | None = None
     frames_indexed: bool = False
     live_clip: bool = False
+    imported: bool = False
     frame_note: str | None = None
     process: object = None
     thread: object = None
@@ -346,7 +347,8 @@ class PreviewManager:
             now = time.monotonic()
             valid_duration = isinstance(duration, (int, float)) and not isinstance(duration, bool) and math.isfinite(duration) and duration > 0
             item = _Preview(id, key, folder, request, now, now, duration if valid_duration else None)
-            item.live_clip = isinstance(request, dict) and bool(request.get('local_clip'))
+            item.live_clip = isinstance(request, dict) and bool(request.get('local_clip') or request.get('history_clip'))
+            item.imported = isinstance(request,dict) and request.get('imported') is True
             self._items[id] = item
             item.thread = threading.Thread(target=self._prepare, args=(item,), daemon=True, name='Keep-preview-' + id)
             result = self._snapshot(item)
@@ -364,15 +366,19 @@ class PreviewManager:
             item.touched = time.monotonic()
             return self._snapshot(item)
 
-    def import_clip(self, path):
+    def import_clip(self, path, imported=False):
         """Import a trusted, completed live clip without reducing its quality."""
-        return self.create({'local_clip': str(path)})
+        return self.create({'local_clip': str(path), 'imported': imported})
 
     def live_file(self, id, key):
         path = self.media_file(id, key)
         with self._lock:
             if not self._items[id].live_clip:
                 raise ValueError('Escolha um clipe criado a partir de uma live no Keep.')
+            if self._items[id].imported:
+                original=self._checked_folder(self._items[id].folder,id)/'source.original'
+                if _is_link(original) or not original.is_file():raise ValueError('O arquivo importado expirou. Importe novamente.')
+                return original
         return path
 
     def media_file(self, id, key):
@@ -609,13 +615,15 @@ class PreviewManager:
                 raise ValueError('A plataforma não entregou o arquivo da prévia. Tente novamente.')
             source = sources[0]
             source_duration, probe = self._probe(item, source, deadline)
+            if item.request.get('history_clip') and abs(source_duration-item.expected_duration)>.25:
+                raise ValueError('O histórico mudou ou ficou incompleto. Consulte novamente a live e escolha o trecho.')
             with self._lock:
                 item.stage = 'Preparando o vídeo para assistir no Keep…'
             target = item.folder / 'preview.mp4'
             video_line = next((line for line in probe.splitlines() if 'Video:' in line), '')
             dimensions = re.search(r'\b(\d{2,5})x(\d{2,5})\b', video_line)
             within_height = bool(dimensions) and int(dimensions.group(2)) <= 480
-            copy = (within_height or bool(local_clip)) and bool(re.search(r'Video:\s*h264(?:\s|\()', video_line)) and bool(re.search(r',\s*yuv420p(?:\(|,|\s)', video_line)) and (
+            copy = (within_height or bool(local_clip) or item.request.get('history_clip')) and bool(re.search(r'Video:\s*h264(?:\s|\()', video_line)) and bool(re.search(r',\s*yuv420p(?:\(|,|\s)', video_line)) and (
                 'Audio:' not in probe or bool(re.search(r'Audio:\s*aac(?:\s|\()', probe)))
             command = [self.ffmpeg, '-hide_banner', '-nostdin', '-y', '-i', source, '-map', '0:v:0', '-map', '0:a:0?', '-sn', '-dn']
             if copy:
@@ -633,7 +641,8 @@ class PreviewManager:
             with self._lock:
                 if item.cancelled.is_set():
                     raise ValueError('Prévia cancelada.')
-                source.unlink()
+                if item.imported:source.rename(item.folder/'source.original')
+                else:source.unlink()
                 for name in ('download.log', 'convert.log', 'probe.log'):
                     (item.folder / name).unlink(missing_ok=True)
                 item.status, item.stage, item.duration = 'ready', 'Prévia pronta.', duration
@@ -683,10 +692,9 @@ CAPTION_MODELS = {
         'sha256': '6e1ce909032e1afa7a88e68a3d628ecafff302bdf195befab308826c395e93b7',
     },
     'en': {
-        'name': 'vosk-en-us-0.15-a5e58ec',
-        'url': 'https://github.com/alphacep/vosk-android-demo/archive/a5e58ec399135f78325bd3e289849fc3fb57ce96.zip',
-        'sha256': 'bac8aca274e9117d4acd1d909da152ef0a7e2612f32359eaf6a43f470cc06630',
-        'path': 'models/src/main/assets/model-en-us',
+        'name': 'vosk-model-small-en-us-0.15',
+        'url': 'https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip',
+        'sha256': '30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498',
     },
 }
 CAPTION_MAX_DURATION = 7200
@@ -857,6 +865,36 @@ def _caption_component(root, name, url, expected, cancelled, progress=None):
     return destination
 
 
+
+
+def caption_model_path(model):
+    """Vosk's Windows file APIs can fail for Unicode installation paths."""
+    model = Path(model).resolve()
+    if not ((model/'am'/'final.mdl').is_file() and (model/'conf'/'mfcc.conf').is_file() or (model/'final.mdl').is_file() and (model/'mfcc.conf').is_file()):
+        raise ValueError('O modelo de voz está incompleto. Repare os componentes das legendas.')
+    if os.name != 'nt' or str(model).isascii():
+        return model, None
+    import ctypes
+    import tempfile
+    buffer = ctypes.create_unicode_buffer(32768)
+    short_path=ctypes.windll.kernel32.GetShortPathNameW
+    short_path.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_uint32]
+    short_path.restype=ctypes.c_uint32
+    if short_path(str(model), buffer, len(buffer)) and buffer.value.isascii():
+        return Path(buffer.value), None
+    candidates = [os.environ.get('PUBLIC'), os.environ.get('TEMP'), str(Path(os.environ.get('SystemRoot','C:/Windows'))/'Temp')]
+    for value in candidates:
+        if not value or not value.isascii():
+            continue
+        try:
+            temporary = tempfile.TemporaryDirectory(prefix='keep-voice-', dir=value)
+            destination = Path(temporary.name)/'model'
+            shutil.copytree(model, destination)
+            return destination, temporary
+        except OSError:
+            if 'temporary' in locals():temporary.cleanup()
+    raise ValueError('O Windows não conseguiu preparar o modelo em um caminho compatível. Extraia o Keep em uma pasta sem acentos, como C:\\Keep, e tente novamente.')
+
 class _CaptionRecognizer:
     """Small ctypes wrapper for the official cross-platform Vosk C API."""
     def __init__(self, library, model):
@@ -877,9 +915,11 @@ class _CaptionRecognizer:
         for name, (args, result) in definitions.items():
             function = getattr(self.library, name); function.argtypes = args; function.restype = result
         self.library.vosk_set_log_level(-1)
-        self.model = self.library.vosk_model_new(os.fsencode(model))
+        compatible, self.model_copy = caption_model_path(model)
+        self.model = self.library.vosk_model_new(os.fsencode(compatible))
         if not self.model:
-            raise ValueError('Não foi possível carregar o modelo de legendas.')
+            if self.model_copy:self.model_copy.cleanup()
+            raise ValueError('Não foi possível carregar o modelo de voz. Repare os componentes e tente novamente; no Windows, use uma pasta sem acentos se o erro persistir.')
 
     def transcribe(self, path, cancelled, progress):
         import wave
@@ -916,6 +956,8 @@ class _CaptionRecognizer:
             self.library.vosk_model_free(self.model); self.model = None
         if self.dll_directory is not None:
             self.dll_directory.close(); self.dll_directory = None
+        if self.model_copy is not None:
+            self.model_copy.cleanup();self.model_copy=None
 
 
 class SubtitleManager:
@@ -970,6 +1012,20 @@ class SubtitleManager:
             if id not in self._tasks:
                 raise ValueError('Legendas não encontradas. Gere-as novamente.')
             return self._snapshot(self._tasks[id])
+
+    def repair(self):
+        with self._lock:
+            if any(t['status'] in ('queued','preparing','transcribing') for t in self._tasks.values()):
+                raise ValueError('Cancele ou aguarde a geração antes de reparar os modelos.')
+            if self._engine:
+                self._engine.close();self._engine=None;self._language=None
+            for name in {m['name'] for m in CAPTION_MODELS.values()} | {'vosk-en-us-0.15-a5e58ec'}:
+                path=self.tools/name
+                if path.exists():
+                    if any(_is_link(p) for p in (path,*path.parents)):
+                        raise ValueError('A pasta dos modelos contém um vínculo.')
+                    path.rename(path.with_name(name+'.previous-'+secrets.token_hex(6)))
+            return {'message':'Modelos redefinidos. Clique em Gerar legendas para baixar uma cópia nova e verificada.'}
 
     def _update(self, task, **values):
         with self._lock:
@@ -1308,3 +1364,46 @@ class LiveManager:
             self.stop(session['id'])
             if not session['thread'].is_alive():
                 session['temp'].cleanup()
+
+
+def freeze_hls(text, base):
+    """Freeze only complete media segments; never follow paths from the browser."""
+    from urllib.parse import urljoin, urlparse
+    def remote(value):
+        url = urljoin(base, value)
+        parsed = urlparse(url)
+        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError('O histórico contém um endereço de mídia incompatível.')
+        return url
+    if not text.startswith('#EXTM3U') or '#EXT-X-STREAM-INF' in text:
+        raise ValueError('A plataforma não disponibilizou um histórico de vídeo direto.')
+    output = ['#EXTM3U', '#EXT-X-PLAYLIST-TYPE:VOD']
+    duration = 0
+    pending = []
+    length = None
+    count = 0
+    for raw in text.splitlines()[1:]:
+        line = raw.strip()
+        if line.startswith('#EXTINF:'):
+            length = float(line.split(':', 1)[1].split(',')[0])
+            if not math.isfinite(length) or length <= 0:
+                raise ValueError('O histórico tem durações inválidas.')
+            pending.append(line)
+        elif line.startswith(('#EXT-X-KEY:', '#EXT-X-MAP:')):
+            line = re.sub(r'URI="([^"]+)"', lambda m: 'URI="' + remote(m[1]) + '"', line)
+            if 'URI=' in line and not re.search(r'URI="https://[^"\r\n]+"',line):
+                raise ValueError('O histórico contém uma chave incompatível.')
+            pending.append(line)
+        elif line.startswith(('#EXT-X-TARGETDURATION:', '#EXT-X-MEDIA-SEQUENCE:', '#EXT-X-DISCONTINUITY', '#EXT-X-BYTERANGE:')):
+            pending.append(line)
+        elif line and not line.startswith('#'):
+            if length is None:
+                raise ValueError('O histórico contém um segmento sem duração.')
+            output.extend(pending);output.append(remote(line));pending=[]
+            duration += length;length = None;count += 1
+            if count > 20000 or duration > 48 * 3600:
+                raise ValueError('O histórico excede o limite de leitura do Keep.')
+    if not count:
+        raise ValueError('Ainda não há trechos anteriores disponíveis nesta live.')
+    output.append('#EXT-X-ENDLIST')
+    return '\n'.join(output)+'\n', duration

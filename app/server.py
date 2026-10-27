@@ -34,7 +34,7 @@ JOBS = {}
 PROCESSES = {}
 PORT = 8765
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-VERSION = '2.1.1'
+VERSION = '2.2.0'
 IS_WINDOWS = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
 SETTINGS = {}
@@ -54,6 +54,7 @@ UPDATES = None
 SUBTITLES = None
 LIVES = None
 HTTP_SERVER = None
+IMPORT_LOCK = threading.Lock()
 
 def preference_status():
     with LOCK:
@@ -658,6 +659,7 @@ def metadata(url, browser='none', cookie_snapshot=None):
             'video_index': entry.get('playlist_index') or index, 'video_id': str(entry.get('id') or ''),
             'title': entry.get('title') or 'Vídeo sem título',
             'creator': entry.get('uploader') or entry.get('channel') or platform,
+            'started_at': entry.get('release_timestamp') or entry.get('timestamp'),
             'duration': entry.get('duration'), 'thumbnail': entry.get('thumbnail'),
             'width': dimension('width'), 'height': dimension('height'), 'fps': fps,
             'heights': sorted({f['height'] for f in entry.get('formats', []) if f.get('height') and f.get('vcodec') != 'none' and f.get('ext') != 'mhtml'}, reverse=True),
@@ -994,7 +996,7 @@ def enqueue_job(id, browser=None):
             raise ValueError('Limpe os parciais deste download antes de tentar novamente.')
         selected = browser if browser is not None else job.get('browser','none')
         snapshot = imported_cookie_text(selected,job['url'])
-        validate_url(job['url'])
+        if not job.get('local_clip'):validate_url(job['url'])
         validate_section(job.get('section'))
         stop_orphan_process(job)
         job.update(browser=selected, status='queued', stage='Na fila', queue_order=time.time(), speed=None, eta=None,
@@ -1037,7 +1039,7 @@ def run_queued_job(id, cookie_snapshot=None):
             validate_section(job['section'], info.get('duration'))
             update_job(id, source_duration=info.get('duration'))
         has_ffmpeg=bool(tool_path('ffmpeg'))
-        args=format_arguments('video' if job.get('edit') else job.get('mode','video'),job.get('quality','1080'),has_ffmpeg)+section_arguments(job.get('section'),has_ffmpeg,job.get('platform'))
+        args=format_arguments('video' if job.get('edit') else job.get('mode','video'),job.get('quality','1080'),has_ffmpeg)+section_arguments(None if job.get('full_source_fallback') else job.get('section'),has_ffmpeg,job.get('platform'))
         run_with_retries(id,args,cookie_snapshot)
     except Exception as error:
         with LOCK:
@@ -1077,6 +1079,22 @@ def run_with_retries(id, args, cookie_snapshot=None):
         with LOCK:
             job = JOBS[id]
             diagnostic = job.get('diagnostic') or {}
+            if (job.get('status') == 'failed' and job.get('section') and job.get('platform') == 'YouTube'
+                    and diagnostic.get('category') == 'processing' and not job.get('full_source_fallback')
+                    and not job.get('stop_request') and not SHUTTING_DOWN and attempt < 3):
+                # Some YouTube streams reject FFmpeg's remote range seeking.
+                # Retry through yt-dlp's normal downloader, then cut locally.
+                folder=checked_job_directory(id)
+                for partial in folder.iterdir():
+                    if partial.name.startswith('.keep-edit-source-'+id+'.') and partial.is_file() and not is_link(partial):
+                        partial.unlink()
+                if not job.get('edit'):
+                    job['edit']=validate_edit({'mode':job['mode'],'sections':[job['section']]},job['source_duration'])
+                job.update(full_source_fallback=True,file=None,filename=None,bytes=None)
+                args=format_arguments('video',job['quality'],bool(tool_path('ffmpeg')))
+                update_job(id,status='downloading',stage='Baixando a origem para cortar no computador',
+                    section_note='O corte direto falhou. O Keep vai baixar a origem e montar somente os trechos escolhidos; isso usa mais tempo e espaço temporário.')
+                continue
             if (job.get('status') != 'failed' or not diagnostic.get('retryable') or attempt >= 3
                     or job.get('stop_request') or SHUTTING_DOWN):
                 return
@@ -1564,7 +1582,7 @@ def _run_download(id, args, session_options):
     JOBS[id].setdefault('id',id)
     checked_job_directory(id)
     report = folder / 'result.jsonl'
-    section = JOBS[id].get('section')
+    section = None if JOBS[id].get('full_source_fallback') else JOBS[id].get('section')
     with LOCK:
         JOBS[id]['output_name']=output_name(JOBS[id],folder)
         persist()
@@ -1623,6 +1641,9 @@ def _run_download(id, args, session_options):
                 note = f'O vídeo termina em {end} s; o trecho foi salvo até o fim real, sem acrescentar conteúdo.'
             update_job(id, effective_section=effective, section_note=note)
         if code == 0 and JOBS[id].get('edit') and JOBS[id].get('file') and not JOBS[id].get('stop_request'):
+            if JOBS[id].get('full_source_fallback'):
+                origin=probe_media(tool_path('ffmpeg'),ROOT/JOBS[id]['file'],process_env())
+                update_job(id,effective_section={'start':0,'end':origin['duration']})
             apply_job_edit(id)
         with LOCK:
             if JOBS[id]['status'] not in ('cancelled','paused') and not JOBS[id].get('stop_request'):
@@ -1648,6 +1669,14 @@ def _run_download(id, args, session_options):
 
 @contextmanager
 def preview_command(request, folder):
+    if request.get('history_playlist'):
+        (folder/'source.m3u8').write_text(request['history_playlist'],encoding='utf-8')
+        headers=''.join(k+': '+v+'\r\n' for k,v in request['history_headers'].items())
+        yield [tool_path('ffmpeg'),'-hide_banner','-nostdin','-y','-protocol_whitelist','file,https,tls,tcp,crypto',
+            '-ss',str(request['start']),'-i',str(folder/'source.m3u8'),'-t',str(request['duration']),
+            '-map','0:v:0','-map','0:a:0?','-c:v','libx264','-preset','veryfast','-threads','2',
+            '-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',str(folder/'source.mp4')]
+        return
     with cookie_options(request['browser'], request['url'], request.get('cookie_snapshot')) as options:
         command = video_command(request.get('video_index', 1), request.get('video_id')) if request['platform'] == 'X' else base_command()
         yield command + options + source_arguments(request['url']) + [
@@ -1680,7 +1709,7 @@ def save_live_clip(path, info, source, body=None):
         edit = validate_edit({'sections': [section], 'mode': mode}, info['duration'])
     created = time.time()
     title = str(source.get('title') or 'Clipe da live')[:150]
-    url, platform = validate_url(source['url'])
+    url, platform = ('', 'Local') if source.get('local_file') is True else validate_url(source['url'])
     with LOCK:
         if SHUTTING_DOWN:
             raise ValueError('O Keep está fechando. Abra novamente para salvar clipes.')
@@ -1739,6 +1768,60 @@ def run_local_clip(id):
             original.unlink(missing_ok=True)
             record_latest_download(job, folder)
             notify_completed_job(id)
+
+
+
+HISTORIES = {}
+
+def available_live_history(body):
+    from preview_media import freeze_hls
+    from urllib.request import Request
+    url, platform = validate_url(body.get('url'))
+    browser = body.get('browser', 'none')
+    snapshot = imported_cookie_text(browser, url)
+    info = metadata(url, browser, snapshot)
+    if not info.get('live') or platform not in ('YouTube','Twitch'):
+        raise ValueError('Busque uma live em andamento para consultar o histórico.')
+    # A Twitch archive can expose the entire broadcast while the channel's
+    # live HLS only exposes a short window. Require matching start timestamps.
+    if platform == 'Twitch' and info.get('started_at'):
+        archive_url = url.rstrip('/') + '/videos?filter=archives&sort=time'
+        with cookie_options(browser,url,snapshot) as options:
+            command=live_command()+options+['--flat-playlist','--dump-single-json','--skip-download','--',archive_url]
+            result=subprocess.run(command,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=60,creationflags=CREATE_FLAGS,env=process_env())
+        try:
+            entry=json.loads(result.stdout)['entries'][0]
+            candidate=entry.get('url') or ''
+            candidate,_=validate_url(candidate)
+            recorded=metadata(candidate,browser,snapshot)
+            if not recorded.get('live') and recorded.get('duration',0)>0 and abs(recorded.get('started_at',0)-info['started_at'])<120:
+                return {'video':recorded,'note':'Gravação desta transmissão disponível. A duração corresponde ao que a plataforma publicou nesta consulta.'}
+        except (ValueError,KeyError,IndexError,TypeError):
+            pass
+    with cookie_options(browser,url,snapshot) as options:
+        result=subprocess.run(live_command()+options+['-f','b[height<=720][protocol^=m3u8]/b[protocol^=m3u8]',
+            '--dump-single-json','--skip-download','--',url],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=100,creationflags=CREATE_FLAGS,env=process_env())
+    if result.returncode:
+        raise ValueError('A plataforma não disponibilizou um histórico acessível nesta live. Você ainda pode acompanhar e salvar os momentos recebidos pelo Keep.')
+    media=json.loads(result.stdout)
+    remote=media.get('url')
+    headers={k:str(v) for k,v in (media.get('http_headers') or {}).items() if k.lower() in ('user-agent','referer','origin') and '\r' not in str(v) and '\n' not in str(v)}
+    if not isinstance(remote,str) or not remote.startswith('https://'):
+        raise ValueError('Não há histórico HLS disponível nesta transmissão.')
+    with urlopen(Request(remote,headers=headers),timeout=25) as response:
+        text=response.read(8*1024*1024+1)
+        base=response.geturl()
+    if len(text)>8*1024*1024:
+        raise ValueError('O histórico excede o limite de leitura do Keep.')
+    playlist,duration=freeze_hls(text.decode('utf-8-sig'),base)
+    with LOCK:
+        now=time.monotonic()
+        for key in list(HISTORIES):
+            if now-HISTORIES[key]['created']>600:HISTORIES.pop(key)
+        while len(HISTORIES)>=8:HISTORIES.pop(next(iter(HISTORIES)))
+        id=secrets.token_urlsafe(24)
+        HISTORIES[id]={'created':now,'playlist':playlist,'headers':headers,'duration':duration,'source':info}
+    return {'id':id,'duration':duration,'note':'Janela que a plataforma disponibilizou nesta consulta. Os horários começam no início dessa janela, que pode não incluir toda a live. Atualize a consulta para ver novos momentos.'}
 
 
 def ensure_services():
@@ -1890,10 +1973,47 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def receive_import(self, length):
+        if not self.safe_host() or self.headers.get('X-Keep-Token') != TOKEN or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}'):
+            self.close_connection=True
+            return self.respond(403, {'error':'Importe o vídeo pela janela do Keep.'})
+        if not 0 < length <= 1024**3:
+            self.close_connection=True
+            raise ValueError('Escolha um vídeo de até 1 GB.')
+        if not IMPORT_LOCK.acquire(blocking=False):
+            self.close_connection=True
+            raise ValueError('Aguarde a importação atual terminar.')
+        try:
+            ensure_services()
+            if SHUTTING_DOWN:raise ValueError('O Keep está fechando.')
+            DATA.mkdir(parents=True,exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix='keep-import-',dir=DATA) as temporary:
+                source=Path(temporary)/'input.media'
+                self.connection.settimeout(30)
+                remaining=length
+                with source.open('xb') as output:
+                    while remaining:
+                        chunk=self.rfile.read(min(1024*1024,remaining))
+                        if not chunk:raise ValueError('O arquivo chegou incompleto. Importe novamente.')
+                        output.write(chunk);remaining-=len(chunk)
+                info=probe_media(tool_path('ffmpeg'),source,process_env())
+                if not info.get('width') or not info.get('height') or info['duration']<=0:
+                    raise ValueError('Escolha um arquivo de vídeo válido.')
+                title=unquote(self.headers.get('X-Keep-Filename','Vídeo importado'))[:200]
+                title=Path(title.replace('\\','/')).name or 'Vídeo importado'
+                preview=PREVIEWS.import_clip(source,imported=True)
+                return self.respond(202,{'preview':preview,'video':{'url':'','platform':'Local','kind':'Arquivo do PC',
+                    'local_file':True,'title':title,'duration':info['duration'],'width':info['width'],'height':info['height'],
+                    'fps':info.get('fps'),'heights':[info['height']],'video_index':1,'live':False}})
+        finally:
+            IMPORT_LOCK.release()
+
     def do_POST(self):
         global COOKIE_GENERATION, SHUTTING_DOWN
         try:
             length = int(self.headers.get('Content-Length', '0'))
+            if self.path == '/api/import':
+                return self.receive_import(length)
             limit = (8 * 1024 * 1024 if self.path == '/api/update/receive' else 2 * MAX_COOKIE_BYTES
                      if self.path == '/api/cookies/import' else 1024 * 1024 if self.path in ('/api/download', '/api/duplicates')
                      else 64 * 1024 if self.path == '/api/settings/import' else 8192)
@@ -1946,6 +2066,24 @@ class Handler(BaseHTTPRequestHandler):
                 request = {'url': url, 'platform': platform, 'browser': browser, 'cookie_snapshot': snapshot,
                     'video_index': info.get('video_index', 1), 'video_id': info.get('video_id') if platform == 'X' else None}
                 return self.respond(202, PREVIEWS.create(request, duration=info.get('duration')))
+            if self.path == '/api/live/history':
+                return self.respond(200, available_live_history(body))
+            if self.path == '/api/live/history/clip':
+                ensure_services()
+                with LOCK:
+                    history=HISTORIES.get(body.get('id'))
+                    if not history or time.monotonic()-history['created']>600:
+                        raise ValueError('O histórico expirou. Consulte novamente a live.')
+                    section=validate_section(body.get('section'),history['duration'])
+                    if not section or section['end']-section['start']>600:
+                        raise ValueError('Escolha um trecho de até dez minutos do histórico.')
+                    duration=section['end']-section['start']
+                    source=history['source']
+                    request={'history_playlist':history['playlist'],'history_headers':history['headers'],
+                        'start':section['start'],'duration':duration,'history_clip':True}
+                preview=PREVIEWS.create(request,duration=duration)
+                return self.respond(202, {'preview':preview,'video':dict(source,live=False,kind='Trecho do histórico',
+                    duration=duration,video_index=1,items=None,inspection_id=None)})
             if self.path == '/api/live/start':
                 ensure_services()
                 if SHUTTING_DOWN:
@@ -1982,6 +2120,9 @@ class Handler(BaseHTTPRequestHandler):
                 preview_info = PREVIEWS.status(preview_id)
                 return self.respond(202, SUBTITLES.create(source, language=body.get('language', 'pt'),
                     preview_id=preview_id, duration=preview_info.get('duration')))
+            if self.path == '/api/subtitles/repair':
+                ensure_services()
+                return self.respond(200, SUBTITLES.repair())
             if self.path == '/api/subtitles/cancel':
                 ensure_services()
                 return self.respond(200, SUBTITLES.cancel(body.get('id')))

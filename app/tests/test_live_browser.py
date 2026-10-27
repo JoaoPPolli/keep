@@ -94,5 +94,55 @@ class LiveBrowserTests(unittest.TestCase):
         self.page.wait_for_selector('#live-panel',state='visible')
         self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
 
+    def test_changing_live_to_recorded_video_hides_panel_and_stops_capture(self):
+        self.routes();self.open_app()
+        self.page.locator('#video-url').fill('https://www.twitch.tv/example')
+        self.page.locator('#inspect').click()
+        self.page.wait_for_selector('#live-panel',state='visible')
+        self.page.locator('#live-start').click()
+        self.page.wait_for_function("()=>liveId==='live-fixture'")
+        recorded={'url':'https://youtu.be/example','platform':'YouTube','title':'Recorded','duration':2,'live':False,'video_index':1,'heights':[360]}
+        self.context.route('**/api/inspect',lambda route:route.fulfill(content_type='application/json',body=json.dumps(recorded)))
+        self.page.locator('#video-url').fill('https://youtu.be/example')
+        self.page.locator('#inspect').click()
+        self.page.wait_for_selector('#video-result',state='visible')
+        self.assertFalse(self.page.locator('#live-panel').is_visible())
+        self.page.wait_for_function("()=>liveId===''&&liveCandidate===null")
+        self.assertTrue(any(path=='/api/live/stop' for path,body in self.live_calls))
+        self.assertEqual(self.page.locator('#video-title').inner_text(),'Recorded')
+
+    def test_import_from_pc_opens_real_preview_without_a_video_link(self):
+        self.open_app()
+        self.page.locator('#local-video').set_input_files({'name':'Meu vídeo.mp4','mimeType':'video/mp4','buffer':self.landscape})
+        self.page.wait_for_function("()=>current?.local_file===true&&$('preview-player').readyState>=2",timeout=20000)
+        self.assertFalse(self.page.locator('#live-panel').is_visible())
+        self.assertEqual(self.page.locator('#video-title').inner_text(),'Meu vídeo.mp4')
+        self.assertTrue(self.page.locator('#download-button').is_enabled())
+        self.page.locator('#vertical-enabled').check()
+        self.page.locator('#vertical-layout-stacked').click()
+        self.assertTrue(self.page.locator('#vertical-preview').is_visible())
+
+    def test_history_window_selection_opens_clip_in_editor(self):
+        self.routes();self.open_app()
+        self.page.locator('#video-url').fill('https://www.twitch.tv/example')
+        self.page.locator('#inspect').click()
+        self.page.wait_for_selector('#live-panel',state='visible')
+        self.context.route('**/api/live/history',lambda route:route.fulfill(content_type='application/json',body=json.dumps({'id':'history-fixture','duration':3600,'note':'Janela disponível.'})))
+        requests=[]
+        def history_clip(route):
+            requests.append(route.request.post_data_json)
+            data={'video':{'url':'https://www.twitch.tv/example','platform':'Twitch','title':'Historic','duration':2,'video_index':1,'live':False},'preview':{'id':'b'*32,'status':'ready','duration':2,'width':640,'height':360,'fps':12,'media_url':'/fixture-landscape.mp4?key=history-key'}}
+            route.fulfill(content_type='application/json',body=json.dumps(data))
+        self.context.route('**/api/live/history/clip',history_clip)
+        self.page.locator('#live-history').click()
+        self.page.wait_for_selector('#live-history-fields',state='visible')
+        self.page.locator('#live-history-start').fill('23:10')
+        self.page.locator('#live-history-end').fill('23:12')
+        self.page.locator('#live-history-preview').click()
+        self.page.wait_for_function("()=>current?.title==='Historic'&&$('preview-player').readyState>=2")
+        self.assertEqual(requests,[{'id':'history-fixture','section':{'start':1390,'end':1392}}])
+        self.assertTrue(self.page.locator('#download-button').is_enabled())
+        self.assertEqual(self.page.evaluate('current.clip.key'),'history-key')
+
 
 if __name__=='__main__':unittest.main()
