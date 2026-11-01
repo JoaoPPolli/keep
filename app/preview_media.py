@@ -30,6 +30,13 @@ FRAME_INDEX_TIMEOUT = 30
 FRAME_LINE = re.compile(r'\[Parsed_showinfo_[^\]]+\]\s+n:\s*(\d+)\s+.*?\bpts_time:\s*([-+\d.eE]+)')
 
 
+def preview_resolution(value=480):
+    """Resolution of the shorter edge; H.264/yuv420p needs even dimensions."""
+    if type(value) is not int or not 2 <= value <= 8192:
+        raise ValueError('Escolha uma resolução inteira entre 2 e 8192 pixels para a prévia.')
+    return value // 2 * 2
+
+
 def _is_link(path):
     return path.is_symlink() or getattr(path, 'is_junction', lambda: False)()
 
@@ -122,6 +129,7 @@ class _Preview:
     live_clip: bool = False
     imported: bool = False
     frame_note: str | None = None
+    preview_height: int = 480
     process: object = None
     thread: object = None
     cancelled: threading.Event = field(default_factory=threading.Event)
@@ -314,9 +322,13 @@ class PreviewManager:
                 'frame_times': item.frame_times if item.status == 'ready' else None,
                 'frames_indexed': item.frames_indexed if item.status == 'ready' else False,
                 'frame_note': item.frame_note,
+                'preview_height': item.preview_height,
                 'media_url': f'/preview/{item.id}?key={item.key}' if item.status == 'ready' else None}
 
     def create(self, request, duration=None):
+        request = dict(request)
+        height = preview_resolution(request.get('preview_height', 480))
+        request['preview_height'] = height
         with self._lock:
             if self._closed:
                 raise ValueError('O Keep está fechando. Abra-o novamente para preparar uma prévia.')
@@ -326,7 +338,8 @@ class PreviewManager:
             # Reuse the small cache by evicting the least recently used finished
             # preview; active workers are never evicted or raced by cleanup.
             while len(self._items) >= self.max_previews:
-                idle = [item for item in self._items.values() if item.status != 'preparing']
+                idle = [item for item in self._items.values() if item.status != 'preparing'
+                        and item.id != request.get('_source_preview')]
                 if not idle:
                     raise ValueError('Já existem duas prévias sendo preparadas. Aguarde ou cancele uma delas.')
                 oldest = min(idle, key=lambda item: item.touched)
@@ -349,6 +362,7 @@ class PreviewManager:
             item = _Preview(id, key, folder, request, now, now, duration if valid_duration else None)
             item.live_clip = isinstance(request, dict) and bool(request.get('local_clip'))
             item.imported = isinstance(request,dict) and request.get('imported') is True
+            item.preview_height = height
             self._items[id] = item
             item.thread = threading.Thread(target=self._prepare, args=(item,), daemon=True, name='Keep-preview-' + id)
             result = self._snapshot(item)
@@ -366,20 +380,26 @@ class PreviewManager:
             item.touched = time.monotonic()
             return self._snapshot(item)
 
-    def import_clip(self, path, imported=False):
-        """Import a trusted, completed live clip without reducing its quality."""
-        return self.create({'local_clip': str(path), 'imported': imported})
+    def import_clip(self, path, imported=False, preview_height=480):
+        """Keep the original separately from the configurable viewing copy."""
+        return self.create({'local_clip': str(path), 'imported': imported, 'preview_height': preview_height})
+
+    def recreate(self, id, key, preview_height):
+        # Hold the cache lock through the copy, and protect the source preview
+        # from eviction. The old capability remains usable if preparation fails.
+        with self._lock:
+            original = self.live_file(id, key)
+            return self.create({'local_clip': str(original), 'imported': self._items[id].imported,
+                                '_source_preview': id, 'preview_height': preview_height})
 
     def live_file(self, id, key):
-        path = self.media_file(id, key)
+        self.media_file(id, key)
         with self._lock:
             if not self._items[id].live_clip:
                 raise ValueError('Escolha um clipe criado a partir de uma live no Keep.')
-            if self._items[id].imported:
-                original=self._checked_folder(self._items[id].folder,id)/'source.original'
-                if _is_link(original) or not original.is_file():raise ValueError('O arquivo importado expirou. Importe novamente.')
-                return original
-        return path
+            original=self._checked_folder(self._items[id].folder,id)/'source.original'
+            if _is_link(original) or not original.is_file():raise ValueError('O original expirou. Importe novamente ou salve outro clipe.')
+            return original
 
     def media_file(self, id, key):
         if not isinstance(id, str) or not ID_PATTERN.fullmatch(id):
@@ -619,17 +639,23 @@ class PreviewManager:
                 item.stage = 'Preparando o vídeo para assistir no Keep…'
             target = item.folder / 'preview.mp4'
             video_line = next((line for line in probe.splitlines() if 'Video:' in line), '')
-            dimensions = re.search(r'\b(\d{2,5})x(\d{2,5})\b', video_line)
-            within_height = bool(dimensions) and int(dimensions.group(2)) <= 480
-            copy = (within_height or bool(local_clip)) and bool(re.search(r'Video:\s*h264(?:\s|\()', video_line)) and bool(re.search(r',\s*yuv420p(?:\(|,|\s)', video_line)) and (
-                'Audio:' not in probe or bool(re.search(r'Audio:\s*aac(?:\s|\()', probe)))
+            dimensions = re.search(r'\b([1-9]\d{0,4})x([1-9]\d{0,4})\b', video_line)
+            within_height = bool(dimensions) and min(map(int, dimensions.groups())) <= item.preview_height
+            copy = within_height and bool(re.search(r'Video:\s*h264(?:\s|\()', video_line)) and bool(re.search(r',\s*yuv420p(?:\(|,|\s)', video_line))
             command = [self.ffmpeg, '-hide_banner', '-nostdin', '-y', '-i', source, '-map', '0:v:0', '-map', '0:a:0?', '-sn', '-dn']
             if copy:
-                command += ['-c', 'copy']
+                command += ['-c:v', 'copy']
             else:
-                command += ['-vf', 'scale=480:480:force_original_aspect_ratio=decrease:force_divisible_by=2',
+                height = item.preview_height
+                scale = (f"scale=w='if(gte(iw,ih),-2,min({height},max(2,trunc(iw/2)*2)))':"
+                         f"h='if(gte(iw,ih),min({height},max(2,trunc(ih/2)*2)),-2)'")
+                command += ['-vf', scale,
                             '-c:v', 'libx264', '-preset', 'veryfast', '-threads', '2', '-pix_fmt', 'yuv420p',
-                            '-b:v', '420k', '-maxrate', '600k', '-bufsize', '1200k', '-c:a', 'aac', '-b:a', '64k']
+                            '-crf', '28']
+            # Resolution never changes the audio policy. Preserve AAC verbatim;
+            # otherwise use a fixed, intelligible audio track even at 2 pixels.
+            command += (['-c:a', 'copy'] if re.search(r'Audio:\s*aac(?:\s|\()', probe) else
+                        ['-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2'])
             command += ['-movflags', '+faststart', target]
             self._run(item, command, 'convert.log', deadline)
             duration, final_probe = self._probe(item, target, deadline)
@@ -639,7 +665,7 @@ class PreviewManager:
             with self._lock:
                 if item.cancelled.is_set():
                     raise ValueError('Prévia cancelada.')
-                if item.imported:source.rename(item.folder/'source.original')
+                if item.live_clip:source.rename(item.folder/'source.original')
                 else:source.unlink()
                 for name in ('download.log', 'convert.log', 'probe.log'):
                     (item.folder / name).unlink(missing_ok=True)
@@ -649,7 +675,7 @@ class PreviewManager:
                 item.frame_note = ('Navegação pelos quadros reais desta prévia.' if item.frames_indexed else
                     'Não foi possível indexar todos os quadros. O avanço usa um passo estimado; confira a imagem antes de marcar o corte.')
                 final_video = next((line for line in final_probe.splitlines() if 'Video:' in line), '')
-                final_dimensions = re.search(r'\b(\d{2,5})x(\d{2,5})\b', final_video)
+                final_dimensions = re.search(r'\b([1-9]\d{0,4})x([1-9]\d{0,4})\b', final_video)
                 final_fps = re.search(r'([\d.]+) fps', final_video)
                 if final_dimensions:
                     item.width, item.height = map(int, final_dimensions.groups())

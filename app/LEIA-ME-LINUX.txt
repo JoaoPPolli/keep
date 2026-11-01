@@ -1,4 +1,4 @@
-KEEP 2.4.0 — GUIA EM PORTUGUÊS BRASILEIRO
+KEEP 2.5.0 — GUIA EM PORTUGUÊS BRASILEIRO
 LINUX — X64 OU ARM64
 
 Esta versão traz câmera empilhada e legendas locais com prévia, além do modo Cheia.
@@ -31,6 +31,19 @@ Informe a pasta antiga do Keep. Dados e componentes são preservados.
 Reabra pelo menu ou por: bash "Iniciar Keep.sh"
 No Keep 1.8 ou posterior, também é possível importar o pacote Linux pequeno
 pelas Preferências. Não use o ZIP Windows nem o atualizador .bat no Linux.
+
+PRÉVIA DOS VÍDEOS
+
+No editor ou em Preferências, escolha 144p, 240p, 360p, 480p (padrão),
+720p, 1080p ou Personalizada em pixels. O valor representa o lado menor
+(altura em paisagem, largura em retrato), sem ampliar o original.
+Valores personalizados vão de 2 a 8192 pixels; os ímpares são ajustados
+para baixo para gerar um vídeo compatível com o player. Valores muito
+baixos perdem detalhes visuais. O áudio não é reduzido junto com a imagem.
+A escolha fica salva neste navegador e vale também para arquivos do PC
+e clipes. Para aplicar a outro vídeo já preparado, clique em Preparar
+novamente. A qualidade final continua usando a escolha do download ou
+o original importado/capturado, mesmo com uma prévia de poucos pixels.
 
 O QUE ESTA VERSÃO INCLUI
 
@@ -145,7 +158,7 @@ Verificar atualização refaz a consulta. Clique em Baixar atualização para
 receber e conferir o pacote; depois, Atualizar e reiniciar instala a versão.
 A consulta não baixa nem instala o pacote automaticamente.
 
-Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.4.0 do seu sistema
+Quem usa o Keep 2.0.0 precisa importar uma vez o pacote 2.5.0 do seu sistema
 nas Preferências. Versões anteriores sem importação podem usar o atualizador
 manual com o Keep fechado. O pacote deve vir da release pública oficial em
 https://github.com/JoaoPPolli/keep/releases. Downloads, fila e preferências

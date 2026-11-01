@@ -73,3 +73,11 @@ minutos. Acompanhe antes do momento desejado e salve 15, 30, 60 ou 120 segundos;
 o original vai para downloads e a prévia permite editar e legendar o clipe.
 A captura usa yt-dlp e FFmpeg em até 720p, sem enviar o vídeo a outro serviço.
 A abertura pelo site aponta para https://joaoppolli.github.io/keep/ sem login.
+
+As prévias têm resolução independente da exportação, com predefinições de
+144p a 1080p e valor personalizado de 2 a 8192 pixels no lado menor. A
+preferência fica neste navegador e aparece no editor e nas Preferências.
+O download da prévia usa a seleção de resolução do yt-dlp sem reduzir o
+áudio; AAC é preservado e outros codecs usam AAC a 128 kb/s e 48 kHz.
+Arquivos importados e clipes mantêm `source.original` para exportar e
+repreparar a imagem em outra resolução sem degradação cumulativa.

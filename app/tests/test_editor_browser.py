@@ -28,6 +28,65 @@ class EditorBrowserTests(unittest.TestCase):
     def pixel_at(self, x, y):
         return self.page.evaluate("([x,y])=>Array.from($('vertical-preview').getContext('2d').getImageData(x,y,1,1).data)", [x, y])
 
+    def test_preview_resolution_is_separate_from_download_and_persists(self):
+        self.prepare_crop()
+        self.mock_captions()
+        self.page.locator('#captions-enabled').check()
+        self.page.locator('#generate-captions').click()
+        self.page.wait_for_function("()=>captionState==='ready'")
+        captions=self.page.evaluate('captionCues')
+        requests=[]
+        def preview(route):
+            requests.append(route.request.post_data_json)
+            route.fulfill(content_type='application/json',body=json.dumps({
+                'id':'fixture-resolution-'+str(len(requests)),'status':'ready','duration':2,'width':640,'height':360,'fps':12,
+                'media_url':'/fixture-landscape.mp4'}))
+        self.context.route('**/api/preview',preview)
+        self.page.locator('#quality').select_option('1080')
+        self.page.locator('#preview-quality').select_option('custom')
+        self.page.locator('#preview-pixels').fill('3')
+        self.page.locator('#prepare-preview').click()
+        self.page.wait_for_function("()=>$('preview-player').readyState>=2")
+        self.page.wait_for_function("()=>captionState==='ready'&&captionBinding===previewId")
+        self.assertEqual(self.page.evaluate('captionCues'),captions)
+        self.assertEqual(requests[-1]['preview_height'],2)
+        self.assertNotIn('quality',requests[-1])
+        download=self.page.evaluate('buildDownloadRequests()[0]')
+        self.assertEqual(download['quality'],'1080')
+        self.assertNotIn('preview_height',download)
+        count=len(requests)
+        self.page.locator('#preview-pixels').fill('1')
+        self.page.locator('#prepare-preview').click()
+        self.assertEqual(len(requests),count)
+        self.assertIn('entre 2 e 8192',self.page.locator('#preview-status').inner_text())
+        self.page.locator('#preview-quality').select_option('144')
+        self.page.locator('[data-view=settings]').click()
+        self.assertEqual(self.page.locator('#default-preview-quality').input_value(),'144')
+        self.page.reload()
+        self.page.wait_for_function("()=>token.length>0")
+        self.assertEqual(self.page.locator('#default-preview-quality').input_value(),'144')
+        self.assertEqual(self.page.locator('#preview-quality').input_value(),'144')
+        self.assertEqual(self.page.locator('#default-preview-pixels').input_value(),'480')
+
+    def test_real_local_import_can_rebuild_a_tiny_preview_and_keep_export_original(self):
+        self.open_app()
+        self.page.locator('[data-view=settings]').click()
+        self.page.locator('#default-preview-quality').select_option('custom')
+        self.page.locator('#default-preview-pixels').fill('2')
+        self.page.locator('[data-view=new]').click()
+        self.page.locator('#local-video').set_input_files({
+            'name':'original.mp4','mimeType':'video/mp4','buffer':self.landscape})
+        self.page.wait_for_function("()=>current?.local_file&&current.clip?.key&&$('preview-player').readyState>=2",timeout=25000)
+        self.assertEqual(self.page.evaluate("[$('preview-player').videoWidth,$('preview-player').videoHeight]"),[4,2])
+        original=self.page.evaluate('({...current.clip})')
+        self.page.locator('#preview-quality').select_option('144')
+        self.page.locator('#prepare-preview').click()
+        self.page.wait_for_function("id=>current.clip.id!==id&&$('preview-player').readyState>=2",arg=original['id'],timeout=25000)
+        self.assertEqual(self.page.evaluate("[$('preview-player').videoWidth,$('preview-player').videoHeight]"),[256,144])
+        exported=self.page.evaluate("async()=>{const response=await api('download',buildDownloadRequests()[0]);const list=await api('jobs');const job=list.find(item=>item.id===response.id);const file=await fetch('/download/'+job.id);return{job,bytes:Array.from(new Uint8Array(await file.arrayBuffer()))};}")
+        self.assertEqual(exported['job']['platform'],'Local')
+        self.assertEqual(bytes(exported['bytes']),self.landscape)
+
     def assert_pixel(self, x, y, color):
         self.page.wait_for_function("""([x,y,color])=>{
             const pixel=$('vertical-preview').getContext('2d').getImageData(x,y,1,1).data;

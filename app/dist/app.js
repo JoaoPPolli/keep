@@ -15,7 +15,7 @@ let editSections=[],previewFPS=null,previewDimensions=null,previewFrameTimes=nul
 let retryEditor=null,retryDownloadOptions=null;
 let cropFrameCallback=null,cropAnimationFrame=null;
 let editorLayout='full',editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};
-let captionSections=null;
+let captionSections=null,pendingCaptionCoverage;
 let captionTask='',captionState='idle',captionCues=[],captionBinding='',captionTimer,captionGeneration=0,pendingCaptionCues=null;
 let desktopStatus=null,desktopWorking=false,restorePoints=[],restoringPoint=false;
 const icons = {YouTube:'yt', X:'x', Twitch:'twitch',Local:'folder'};
@@ -25,6 +25,32 @@ let defaultQuality = '1080';
 try { defaultQuality = localStorage.getItem('keep-quality') || '1080'; } catch {}
 if (!['best','2160','1080','720','480'].includes(defaultQuality)) defaultQuality = '1080';
 $('default-quality').value = defaultQuality;
+let previewQuality='480',previewCustomPixels='480';
+try{previewQuality=localStorage.getItem('keep-preview-quality')||'480';previewCustomPixels=localStorage.getItem('keep-preview-pixels')||'480';}catch{}
+if(!['144','240','360','480','720','1080','custom'].includes(previewQuality))previewQuality='480';
+if(!/^\d+$/.test(previewCustomPixels)||Number(previewCustomPixels)<2||Number(previewCustomPixels)>8192)previewCustomPixels='480';
+function previewResolution(){
+ const value=Number(previewQuality==='custom'?previewCustomPixels:previewQuality);
+ if(!Number.isInteger(value)||value<2||value>8192)throw new Error('Escolha uma resolução inteira entre 2 e 8192 pixels para a prévia.');
+ return Math.floor(value/2)*2;
+}
+function syncPreviewQuality(){
+ for(const prefix of ['preview','default-preview']){
+  $(prefix+'-quality').value=previewQuality;$(prefix+'-pixels').value=previewCustomPixels;
+  $(prefix+'-custom-wrap').hidden=previewQuality!=='custom';
+ }
+}
+for(const prefix of ['preview','default-preview']){
+ const changed=()=>{
+  previewQuality=$(prefix+'-quality').value;previewCustomPixels=$(prefix+'-pixels').value;syncPreviewQuality();
+  for(const group of ['preview','default-preview'])$(group+'-quality-error').hidden=true;
+  try{previewResolution();try{localStorage.setItem('keep-preview-quality',previewQuality);localStorage.setItem('keep-preview-pixels',previewCustomPixels);}catch{}
+   if(current)$('preview-status').textContent='A resolução escolhida será usada ao preparar a prévia novamente. O áudio e a qualidade final são independentes dessa opção.';
+  }catch(error){for(const group of ['preview','default-preview']){$(group+'-quality-error').textContent=error.message;$(group+'-quality-error').hidden=false;}}
+ };
+ $(prefix+'-quality').addEventListener('change',changed);$(prefix+'-pixels').addEventListener('input',changed);
+}
+syncPreviewQuality();
 function toast(text) { $('toast').textContent=text; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,3500); }
 function message(text, error=false) { $('message').textContent=text; $('message').className='message'+(error?' error':''); $('message').hidden=!text; }
 function configureQuality(heights = []) {
@@ -72,7 +98,7 @@ function updateSection() {
   for(const id of ['mark-start','mark-end','play-section'])$(id).hidden=!partial;
   $('timeline').hidden=!partial;
   $('quality').disabled = audio||gif||!!current?.clip;
-  if(current?.clip)$('quality-note').textContent='O download usa a cópia preparada nesta prévia. Clique em Baixar para salvar sua versão.';
+  if(current?.clip)$('quality-note').textContent='O download usa o original importado ou o clipe capturado da live. A resolução da prévia não reduz a qualidade do arquivo salvo.';
   $('scope-full').disabled=gif;
   $('custom-name-hint').textContent='Digite o nome sem extensão. O Keep adiciona '+(gif?'GIF':audio?'MP3':'MP4')+'. Cada download continua em sua própria pasta.';
   $('section-output-note').hidden=!partial||$('section-output').value!=='join'||editSections.length<2;
@@ -120,7 +146,7 @@ function configureSection(section) {
 }
 function resetEditor() {
  editSections=[];previewFPS=null;previewDimensions=null;previewFrameTimes=null;previewFrameNote='';cropDrag=null;frameSeekBusy=false;
- $('circle-size').value='35';$('circle-x').value='5';$('circle-y').value='5';editorLayout='full';pendingCaptionCues=null;editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};$('camera-height').value='30';$('region-select').value='camera';syncRegionFields();$('captions-enabled').checked=false;resetCaptionState();
+ $('circle-size').value='35';$('circle-x').value='5';$('circle-y').value='5';editorLayout='full';pendingCaptionCues=null;pendingCaptionCoverage=undefined;editorRegions={camera:{x:0,y:0,width:.28,height:.28},content:{x:.25,y:0,width:.5,height:1}};$('camera-height').value='30';$('region-select').value='camera';syncRegionFields();$('captions-enabled').checked=false;resetCaptionState();
  $('vertical-enabled').checked=false;$('crop-x').value='50';$('crop-y').value='50';$('section-output').value='separate';
  renderSections();
 }
@@ -597,11 +623,11 @@ $('live-clip').addEventListener('click',async()=>{
  if(!liveId||liveClipping||liveBusy)return;
  liveClipping=true;renderLive(liveState);const generation=previewGeneration;
  try{
-  const data=await api('live/clip',{id:liveId,seconds:Number($('live-seconds').value)});
+  const data=await api('live/clip',{id:liveId,seconds:Number($('live-seconds').value),preview_height:previewResolution()});
   if(generation!==previewGeneration){if(data.preview?.id)api('preview/cancel',{id:data.preview.id}).catch(()=>{});toast('Clipe salvo em Meus downloads.');return;}
   inspection=null;currentItems=[{...data.video,clip:{id:data.preview.id}}];selectedVideos=new Set(['1']);
   showCurrentVideo(currentItems[0]);renderPostVideos();$('video-result').hidden=false;
-  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=true;$('cancel-preview').hidden=true;
+  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=data.preview.status!=='ready';$('cancel-preview').hidden=true;
   message('Clipe original salvo em Meus downloads. Use a prévia abaixo para cortar, compor a câmera e gerar legendas; Baixar salva outra versão com suas edições.');
   await refresh();refreshStorage(true);
  }catch(error){$('live-status').textContent=error.message;$('live-status').classList.add('invalid');}
@@ -643,7 +669,7 @@ async function inspectVideo(automatic = false) {
   }catch(error){message(error.message,true);}finally{searching=false;$('cookie-file').disabled=false;$('remove-cookies').disabled=false;$('inspect').disabled=false;$('paste-download').disabled=false;$('inspect').innerHTML='Buscar vídeo'+icon('arrow');}
 }
 function invalidateVideo(){detachLive();resetPreview();resetEditor();current=null;inspection=null;currentItems=[];selectedVideos.clear();$('custom-name').value='';$('video-result').hidden=true;}
-function resetPreview() {
+function resetPreview(preserveClip=false) {
   resetCaptionState();
   const previous=previewId;previewId='';previewGeneration++;clearTimeout(previewTimer);previewPlayingSection=false;
   previewFPS=null;previewDimensions=null;previewFrameTimes=null;previewFrameNote='';frameSeekBusy=false;cropDrag=null;$('crop-overlay').setAttribute('hidden','');
@@ -654,7 +680,8 @@ function resetPreview() {
   $('preview-status').textContent='A prévia é preparada no seu computador e pode levar alguns instantes.';
   $('preview-status').classList.remove('invalid');
   ['mark-start','mark-end','play-section','frame-back','frame-forward'].forEach(id=>$(id).disabled=true);
-  if(previous&&token)api('preview/cancel',{id:previous}).catch(()=>{});
+  const retained=preserveClip?current?.clip?.id:null;
+  for(const id of new Set([previous,current?.clip?.id].filter(Boolean)))if(id!==retained&&token)api('preview/cancel',{id}).catch(()=>{});
   renderCaptionState();
 }
 function showPreview(data,generation) {
@@ -662,7 +689,7 @@ function showPreview(data,generation) {
   if(data.id)previewId=data.id;
   if(data.status==='cancelled'||data.status==='failed'||data.status==='error'||data.error)throw new Error(data.error||(data.status==='cancelled'?'A prévia foi cancelada.':'Não foi possível preparar a prévia.'));
   if(data.status==='ready'&&data.media_url) {
-    if(current?.clip?.id===data.id)current.clip.key=new URL(data.media_url,location.href).searchParams.get('key');
+    if(current?.clip){const previous=current.clip.id;current.clip={id:data.id,key:new URL(data.media_url,location.href).searchParams.get('key')};if(previous!==data.id&&token)api('preview/cancel',{id:previous}).catch(()=>{});}
     previewFPS=data.fps;previewDimensions={width:data.width,height:data.height};
     previewFrameTimes=data.frames_indexed===true?validatedFrameTimes(data.frame_times,Number(data.duration)):null;
     previewFrameNote=data.frames_indexed===true&&!previewFrameTimes?'A lista de quadros não pôde ser usada nesta página; os passos são estimados.':typeof data.frame_note==='string'?data.frame_note:'';
@@ -671,8 +698,8 @@ function showPreview(data,generation) {
     const player=$('preview-player');player.src=media.href;player.load();
     $('preview-player-wrap').hidden=false;$('prepare-preview').disabled=false;$('prepare-preview').innerHTML=icon('play')+'Preparar novamente';
     $('cancel-preview').textContent='Descartar prévia';
-    if(current?.clip){$('prepare-preview').disabled=true;$('prepare-preview').textContent='Clipe da live pronto';$('cancel-preview').hidden=true;}
-    $('preview-status').textContent='Dê play e use Marcar início e Marcar fim na posição desejada. A prévia pode ter qualidade menor; o download usa a qualidade escolhida.';
+    if(current?.clip)$('cancel-preview').hidden=true;
+    $('preview-status').textContent='Prévia pronta'+(data.width&&data.height?' · '+data.width+' × '+data.height+' pixels':'')+'. Dê play para conferir. O áudio é mantido e o download usa a qualidade final escolhida.';
     return;
   }
   $('preview-status').textContent=data.message||data.stage||'Preparando uma prévia no seu computador. Vídeos longos podem levar mais tempo.';
@@ -689,18 +716,21 @@ function previewError(error,generation) {
 }
 $('prepare-preview').addEventListener('click',async()=>{
   if(!current||selectedItems().length!==1)return;
-  resetPreview();const generation=previewGeneration;
+  let request;try{request={...videoRequest(),preview_height:previewResolution()};}catch(error){$('preview-status').textContent=error.message;return;}
+  const previousCaptions=captionState==='ready'&&captionBinding===previewId?{cues:captionCues.map(cue=>({...cue})),sections:captionSections?.map(part=>({...part}))??null}:null;
+  resetPreview(true);const generation=previewGeneration;
+  if(previousCaptions){pendingCaptionCues=previousCaptions.cues;pendingCaptionCoverage=previousCaptions.sections;}
   $('cancel-preview').hidden=false;$('cancel-preview').textContent='Cancelar prévia';
   $('prepare-preview').disabled=true;$('preview-status').textContent='Preparando a prévia… Mantenha o Keep aberto.';
   try {
-    const data=await api('preview',videoRequest());
+    const data=await api('preview',request);
     if(generation!==previewGeneration){if(data.id)api('preview/cancel',{id:data.id}).catch(()=>{});return;}
     showPreview(data,generation);
   } catch(error){previewError(error,generation);}
 });
-$('cancel-preview').addEventListener('click',()=>{resetPreview();$('preview-status').textContent='Prévia descartada. Os horários escolhidos foram mantidos.';});
+$('cancel-preview').addEventListener('click',()=>{resetPreview(!!current?.clip);$('preview-status').textContent='Prévia descartada. Os horários escolhidos foram mantidos.';});
 $('preview-player').addEventListener('loadedmetadata',()=>{
-  if(pendingCaptionCues&&previewId){captionCues=pendingCaptionCues;pendingCaptionCues=null;captionSections=editSections.length?editSections.map(part=>({...part})):null;captionBinding=previewId;captionState='ready';renderCaptionReview();$('captions-status').textContent='Legendas da edição anterior recuperadas. Confira o texto na nova prévia.';}
+  if(pendingCaptionCues&&previewId){captionCues=pendingCaptionCues;pendingCaptionCues=null;captionSections=pendingCaptionCoverage!==undefined?pendingCaptionCoverage:editSections.length?editSections.map(part=>({...part})):null;pendingCaptionCoverage=undefined;captionBinding=previewId;captionState='ready';renderCaptionReview();$('captions-status').textContent='Legendas da edição anterior recuperadas. Confira o texto na nova prévia.';}
   ['mark-start','mark-end'].forEach(id=>$(id).disabled=false);updateSection();
   $('preview-clock').textContent=timeLabel($('preview-player').currentTime)+' / '+timeLabel($('preview-player').duration||current?.duration||0);
   updateVertical();updateFrameInfo();updateTimelineClock();
@@ -922,7 +952,7 @@ function renderJobs(){
  const active=jobs.filter(job=>job.status==='downloading').length,queued=jobs.filter(job=>job.status==='queued').length,paused=jobs.filter(job=>job.status==='paused').length;
  $('queue-summary').textContent=[active?`${active} em andamento`:null,queued?`${queued} na fila`:null,paused?`${paused} pausado${paused===1?'':'s'}`:null].filter(Boolean).join(' · ')||'Até dois downloads ao mesmo tempo. Os próximos começam automaticamente.';
 }
-async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.4.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
+async function refresh(){if(!token||keepClosed)return;try{const data=await api('jobs');if(keepClosed)return;jobs=data;if(!queueDragId)renderJobs();refreshStorage();$('connection').className='connection online';$('connection').innerHTML='<span></span>Keep '+esc(session?.version||'2.5.0')+' conectado';}catch{if(keepClosed)return;$('connection').className='connection';$('connection').innerHTML='<span></span>'+(updateStatus?.state==='applying'?'Keep reiniciando…':'Desconectado · reinicie o Keep');}}
 async function refreshStorage(force=false) {
  if(!local||!token||keepClosed||(!force&&Date.now()-storageCheckedAt<12000))return;
  storageCheckedAt=Date.now();
@@ -1120,7 +1150,7 @@ function renderUpdate(data) {
   $('download-update').hidden=!data.can_download||rollback;
   $('download-update').disabled=busy||!local||!token;
   $('download-update').textContent=state==='failed'?'Tentar baixar novamente':'Baixar atualização';
-  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.4.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
+  $('update-version').textContent='Versão instalada: '+(data.current_version||session?.version||'2.5.0')+(data.latest_version?(rollback?' · Restaurar: ':' · Mais recente: ')+data.latest_version:'');
   const labels={idle:'Verifique se há uma nova versão disponível.',checking:'Verificando a versão na página de atualizações…',available:'Uma nova versão está disponível.',current:'Você está usando a versão mais recente.',downloading:'Recebendo e verificando a atualização…',ready:'Atualização verificada. Clique em Atualizar e reiniciar para instalar.',applying:'Atualizando e reiniciando o Keep. Aguarde nesta página…',failed:'Não foi possível verificar a atualização.'};
   $('update-status').textContent=data.error||(rollback&&state==='applying'?'Restaurando a versão anterior e reiniciando o Keep. Aguarde nesta página…':data.message)||(rollback&&state==='ready'?'Cópia anterior conferida. Clique em Restaurar e reiniciar para concluir.':labels[state]||labels.idle);
   $('update-status').classList.toggle('invalid',state==='failed'||!!data.error);
@@ -1264,15 +1294,16 @@ $('local-video').addEventListener('change',async()=>{
  const file=$('local-video').files[0];if(!file)return;
  if(!local||!token){$('import-status').textContent='Abra o Keep no computador para importar vídeos.';return;}
  if(searching||startingDownload||batchRunning)return;
+ let height;try{height=previewResolution();}catch(error){$('import-status').textContent=error.message;return;}
  invalidateVideo();const generation=previewGeneration;searching=true;$('inspect').disabled=true;$('local-video').disabled=true;
  $('import-status').textContent='Importando e preparando a prévia… O original permanece na sua pasta.';
  try{
-  const response=await fetch('/api/import',{method:'POST',headers:{'X-Keep-Token':token,'X-Keep-Filename':encodeURIComponent(file.name),'Content-Type':'application/octet-stream'},body:file});
+  const response=await fetch('/api/import',{method:'POST',headers:{'X-Keep-Token':token,'X-Keep-Filename':encodeURIComponent(file.name),'X-Keep-Preview-Height':String(height),'Content-Type':'application/octet-stream'},body:file});
   const data=await response.json();if(!response.ok)throw new Error(data.error||'Não foi possível importar este vídeo.');
   if(generation!==previewGeneration){api('preview/cancel',{id:data.preview.id}).catch(()=>{});return;}
   $('video-url').value='';inspection=null;currentItems=[{...data.video,clip:{id:data.preview.id}}];selectedVideos=new Set(['1']);
   showCurrentVideo(currentItems[0]);renderPostVideos();$('video-result').hidden=false;
-  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=true;$('cancel-preview').hidden=true;
+  showPreview(data.preview,previewGeneration);$('prepare-preview').disabled=data.preview.status!=='ready';$('cancel-preview').hidden=true;
   $('import-status').textContent='Vídeo importado. Use a prévia e clique em Baixar para salvar uma versão editada.';
  }catch(error){$('import-status').textContent=error.message;}
  finally{searching=false;$('inspect').disabled=false;$('local-video').disabled=false;$('local-video').value='';}

@@ -251,6 +251,7 @@ class BrowserTests(unittest.TestCase):
         self.page.locator('#center-crop').click()
         self.assert_color([0, 255, 0])
         # Drag the actual overlay frame to the left edge of the original image.
+        self.page.locator('#preview-player').scroll_into_view_if_needed()
         frame = self.page.locator('#crop-drag-handle').bounding_box()
         self.page.mouse.move(frame['x'] + 2, frame['y'] + frame['height']/2)
         self.page.mouse.down()

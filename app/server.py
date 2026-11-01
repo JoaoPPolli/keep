@@ -34,7 +34,7 @@ JOBS = {}
 PROCESSES = {}
 PORT = 8765
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-VERSION = '2.4.0'
+VERSION = '2.5.0'
 IS_WINDOWS = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
 SETTINGS = {}
@@ -1669,12 +1669,14 @@ def _run_download(id, args, session_options):
 
 @contextmanager
 def preview_command(request, folder):
+    from preview_media import preview_resolution
+    height = preview_resolution(request.get('preview_height', 480))
     with cookie_options(request['browser'], request['url'], request.get('cookie_snapshot')) as options:
         command = video_command(request.get('video_index', 1), request.get('video_id')) if request['platform'] == 'X' else base_command()
         yield command + options + source_arguments(request['url']) + [
             '--no-continue', '--no-simulate', '--no-progress',
-            '-f', 'bv*[height<=480]+ba/b[height<=480]/b[height<=720]',
-            '-S', 'res,proto:https', '--merge-output-format', 'mkv',
+            '-f', 'bv+ba/b',
+            '-S', f'res:{height},proto:https', '--merge-output-format', 'mkv',
             '-o', str(folder).replace('%', '%%') + os.sep + 'source.%(ext)s', '--', request['url']]
 
 
@@ -1916,6 +1918,12 @@ class Handler(BaseHTTPRequestHandler):
         if not self.safe_host() or self.headers.get('X-Keep-Token') != TOKEN or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}'):
             self.close_connection=True
             return self.respond(403, {'error':'Importe o vídeo pela janela do Keep.'})
+        from preview_media import preview_resolution
+        try:
+            height = preview_resolution(int(self.headers.get('X-Keep-Preview-Height', '480')))
+        except (ValueError, TypeError):
+            self.close_connection = True
+            raise ValueError('Escolha uma resolução inteira entre 2 e 8192 pixels para a prévia.') from None
         if length <= 0:
             self.close_connection=True
             raise ValueError('Escolha um arquivo de vídeo não vazio.')
@@ -1942,7 +1950,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Escolha um arquivo de vídeo válido.')
                 title=unquote(self.headers.get('X-Keep-Filename','Vídeo importado'))[:200]
                 title=Path(title.replace('\\','/')).name or 'Vídeo importado'
-                preview=PREVIEWS.import_clip(source,imported=True)
+                preview=PREVIEWS.import_clip(source,imported=True,preview_height=height)
                 return self.respond(202,{'preview':preview,'video':{'url':'','platform':'Local','kind':'Arquivo do PC',
                     'local_file':True,'title':title,'duration':info['duration'],'width':info['width'],'height':info['height'],
                     'fps':info.get('fps'),'heights':[info['height']],'video_index':1,'live':False}})
@@ -1996,6 +2004,13 @@ class Handler(BaseHTTPRequestHandler):
                 ensure_services()
                 if SHUTTING_DOWN:
                     raise ValueError('O Keep está fechando. Aguarde e tente novamente.')
+                from preview_media import preview_resolution
+                height = preview_resolution(body.get('preview_height', 480))
+                clip = body.get('clip')
+                if clip is not None:
+                    if not isinstance(clip, dict):
+                        raise ValueError('Escolha uma prévia válida.')
+                    return self.respond(202, PREVIEWS.recreate(clip.get('id'), clip.get('key'), height))
                 url, platform = validate_url(body.get('url'))
                 browser = body.get('browser', preference_status()['default_browser'])
                 snapshot = imported_cookie_text(browser, url)
@@ -2005,7 +2020,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not tool_path('ffmpeg'):
                     raise ValueError('A prévia precisa do FFmpeg. Prepare os componentes e tente novamente.')
                 request = {'url': url, 'platform': platform, 'browser': browser, 'cookie_snapshot': snapshot,
-                    'video_index': info.get('video_index', 1), 'video_id': info.get('video_id') if platform == 'X' else None}
+                    'video_index': info.get('video_index', 1), 'video_id': info.get('video_id') if platform == 'X' else None,
+                    'preview_height': height}
                 return self.respond(202, PREVIEWS.create(request, duration=info.get('duration')))
             if self.path == '/api/live/start':
                 ensure_services()
@@ -2025,9 +2041,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, LIVES.stop(body.get('id')))
             if self.path == '/api/live/clip':
                 ensure_services()
+                from preview_media import preview_resolution
+                height = preview_resolution(body.get('preview_height', 480))
                 source = LIVES.source(body.get('id'))
                 def consume_clip(path, info):
-                    preview = PREVIEWS.import_clip(path)
+                    preview = PREVIEWS.import_clip(path, preview_height=height)
                     job = save_live_clip(path, info, source)
                     return {'preview': preview, 'job': job, 'video': {
                         'url': source['url'], 'platform': source['platform'], 'kind': 'Clipe da live',

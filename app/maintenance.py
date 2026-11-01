@@ -52,6 +52,11 @@ NOTES = {
     '2.2.1': ['Consulta automática de novas versões a cada cinco minutos com a aba visível e ao voltar para o Keep.', 'Consultas ao canal público com chave de cache renovada para evitar resultados antigos. O download e a instalação continuam sob sua escolha.'],
     '2.3.0': ['Importação de vídeos do PC com cartão, ícone e botão integrados ao visual do Keep.', 'Modo Circular no editor vertical: câmera em círculo sobre o conteúdo, com tamanho e posição ajustáveis na prévia e no vídeo exportado.', 'Removida a opção "Consultar histórico de live". Não funcionou dentro das expectativas. A função de clipes de live só funcionara após o momento que você clicar em "Acompanhar live" e até os últimos 2 minutos após isso.'],
     '2.4.0': ['Removidos os limites fixos de tamanho da importação e de duração da edição de vídeos; o espaço disponível e os recursos do computador continuam necessários.', 'Circular agora se chama Bola. (Update mais importante da história)', 'Aviso destacado: as legendas automáticas não são perfeitas e podem ter uma margem de erro grande. Revise todo o texto antes de salvar.', 'Ao selecionar trechos, o reconhecimento de fala processa somente esses intervalos, preservando os horários do vídeo original. Ao ampliar a seleção, o app pede novas legendas.'],
+    '2.5.0': [
+        'Resolução da prévia ajustável: 144p, 240p, 360p, 480p, 720p, 1080p e valor personalizado a partir de 2 pixels.',
+        'A escolha vale para links, arquivos do PC e clipes de live, e pode ser alterada ao preparar a prévia novamente.',
+        'O áudio da prévia é independente da resolução da imagem. Os originais são preservados e a escolha não reduz a qualidade final do download.',
+    ],
 }
 
 

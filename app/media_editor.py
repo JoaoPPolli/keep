@@ -271,7 +271,7 @@ def probe_media(ffmpeg, path, env=None):
     text = result.stderr
     duration = re.search(r'Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)', text)
     video = next((line for line in text.splitlines() if 'Video:' in line), '')
-    dimensions = re.search(r'\b(\d{2,5})x(\d{2,5})\b', video)
+    dimensions = re.search(r'\b([1-9]\d{0,4})x([1-9]\d{0,4})\b', video)
     fps = re.search(r'([\d.]+) fps', video)
     if not duration:
         raise ValueError('Não foi possível conferir o arquivo da edição. Tente baixar novamente.')

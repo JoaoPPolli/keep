@@ -63,7 +63,7 @@ class LiveBrowserTests(unittest.TestCase):
         self.page.wait_for_function("()=>$('preview-player').readyState>=2")
         self.assertTrue(self.page.locator('#video-result').is_visible())
         self.assertIn('Clipe original salvo',self.page.locator('#message').inner_text())
-        self.assertTrue(self.page.locator('#prepare-preview').is_disabled())
+        self.assertFalse(self.page.locator('#prepare-preview').is_disabled())
         self.assertTrue(self.page.locator('#quality').is_disabled())
         self.page.locator('#vertical-enabled').check()
         self.page.locator('#vertical-layout-stacked').click()
