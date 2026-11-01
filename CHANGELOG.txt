@@ -1,15 +1,21 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.4.0
+Versão atual: 2.5.0
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.4.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.5.0
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.5.0 — Qualidade ajustável da prévia
+
+- Resolução da prévia ajustável: 144p, 240p, 360p, 480p, 720p, 1080p e valor personalizado a partir de 2 pixels.
+- A escolha vale para links, arquivos do PC e clipes de live, e pode ser alterada ao preparar a prévia novamente.
+- O áudio da prévia é independente da resolução da imagem. Os originais são preservados e a escolha não reduz a qualidade final do download.
 
 2.4.0 — Bola, importação sem teto fixo e legendas por trecho
 
