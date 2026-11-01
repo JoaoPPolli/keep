@@ -1,15 +1,19 @@
 KEEP — HISTÓRICO DE VERSÕES
 
-Versão atual: 2.5.0
+Versão atual: 2.5.1
 Notas em português brasileiro. As versões aparecem da mais recente para a
 mais antiga. O aplicativo e os pacotes de atualização estão disponíveis no
 GitHub. Este histórico não inclui vídeos ou informações de usuários.
 
 DOWNLOADS
-https://github.com/JoaoPPolli/keep/releases/tag/v2.5.0
+https://github.com/JoaoPPolli/keep/releases/tag/v2.5.1
 
 SITE DO KEEP
 https://joaoppolli.github.io/keep/
+
+2.5.1 — Hotfix visual da prévia
+
+- Botões de preparar e cancelar a prévia agrupados, com espaçamento compacto e adaptação a telas menores.
 
 2.5.0 — Qualidade ajustável da prévia
 

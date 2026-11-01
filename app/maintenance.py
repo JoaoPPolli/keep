@@ -57,6 +57,7 @@ NOTES = {
         'A escolha vale para links, arquivos do PC e clipes de live, e pode ser alterada ao preparar a prévia novamente.',
         'O áudio da prévia é independente da resolução da imagem. Os originais são preservados e a escolha não reduz a qualidade final do download.',
     ],
+    '2.5.1': ['Botões de preparar e cancelar a prévia agrupados, com espaçamento compacto e adaptação a telas menores.'],
 }
 
 

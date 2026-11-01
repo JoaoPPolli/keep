@@ -34,7 +34,7 @@ JOBS = {}
 PROCESSES = {}
 PORT = 8765
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-VERSION = '2.5.0'
+VERSION = '2.5.1'
 IS_WINDOWS = sys.platform == 'win32'
 IS_LINUX = sys.platform.startswith('linux')
 SETTINGS = {}
